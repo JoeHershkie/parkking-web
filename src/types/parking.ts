@@ -1,4 +1,9 @@
-import type { Feature, FeatureCollection, LineString } from 'geojson'
+import type {
+  Feature,
+  FeatureCollection,
+  LineString,
+  MultiLineString,
+} from 'geojson'
 import type { FilterPolarity, Schedule } from '../lib/schedule'
 
 export type { Schedule } from '../lib/schedule'
@@ -22,11 +27,16 @@ export interface ParkingProperties {
   _unparsed?: boolean
   _partial?: boolean
   _failed?: boolean
+  /** Stable source-derived key for highlight/selection across updates */
+  _featureKey?: string
+  /** Draw order: restricted=0, unclear=1, allowed=2 (higher draws on top) */
+  _severity?: number
 }
 
-export type ParkingFeature = Feature<LineString, ParkingProperties>
+export type ParkingGeometry = LineString | MultiLineString
+export type ParkingFeature = Feature<ParkingGeometry, ParkingProperties>
 export type ParkingFeatureCollection = FeatureCollection<
-  LineString,
+  ParkingGeometry,
   ParkingProperties
 >
 
