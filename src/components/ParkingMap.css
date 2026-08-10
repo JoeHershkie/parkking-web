@@ -1,8 +1,6 @@
 .parking-map-wrap {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
+  position: absolute;
+  inset: 0;
 }
 
 .parking-map {
@@ -10,66 +8,64 @@
   inset: 0;
 }
 
-.map-overlay-loading {
+.map-overlay-loading,
+.map-overlay-error {
   position: absolute;
-  top: 0.75rem;
-  left: 50%;
-  transform: translateX(-50%);
   z-index: 3;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
-  color: var(--text-h);
-  font-size: 0.9rem;
   pointer-events: none;
 }
 
+.map-overlay-loading {
+  top: max(5.5rem, calc(var(--safe-top) + 4.5rem));
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-float);
+  color: var(--color-ink);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
 .map-overlay-error {
-  position: absolute;
   inset: 0;
-  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.85);
-  color: var(--text-h);
+  background: rgb(255 255 255 / 0.88);
+  color: var(--color-ink);
   font-size: 1rem;
-  padding: 1rem;
+  padding: 1.5rem;
   text-align: center;
-}
-
-@media (prefers-color-scheme: dark) {
-  .map-overlay-error {
-    background: rgba(22, 23, 29, 0.9);
-  }
+  pointer-events: auto;
 }
 
 .map-overlay-error code {
   font-size: 0.85em;
-  background: var(--code-bg);
+  background: var(--color-surface-muted);
   padding: 0.1em 0.35em;
   border-radius: 4px;
 }
 
-.maplibregl-popup-content {
-  padding: 0.75rem 1rem;
-  font-size: 0.85rem;
-  line-height: 1.4;
+.maplibregl-ctrl-attrib,
+.maplibregl-ctrl-bottom-left .maplibregl-ctrl-attrib,
+.maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib {
+  display: none !important;
 }
 
-.map-popup strong {
-  display: block;
+.maplibregl-ctrl-bottom-right {
+  margin-bottom: 7.5rem;
+  margin-right: 0.75rem;
+}
+
+.maplibregl-ctrl-bottom-left {
   margin-bottom: 0.5rem;
-  color: var(--text-h);
+  margin-left: 0.5rem;
 }
 
-.popup-row {
-  margin-bottom: 0.25rem;
-}
-
-.popup-row span {
-  color: var(--text);
-  font-weight: 500;
+.maplibregl-ctrl-group button {
+  width: 44px !important;
+  height: 44px !important;
 }

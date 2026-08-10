@@ -1,6 +1,6 @@
 # Toronto Parking Bylaws (parking-web)
 
-Interactive map of geocoded Toronto curb parking bylaws. Data is produced by the separate `parking-pipeline` project and loaded as static GeoJSON in this app.
+Mobile-first map of geocoded Toronto curb parking bylaws. Data is produced by the separate `parking-pipeline` project and loaded as static GeoJSON in this app.
 
 ## Prerequisites
 
@@ -40,14 +40,15 @@ npm run preview
 
 ## Map features
 
-- Colored line segments by restriction type (`no_parking`, `no_stopping`, `no_standing`, `restricted_periods`)
-- **Date/time filter** — calendar date (defaults to today), start time, and optional end time on the same day; map colors reflect whether each rule’s structured `schedule` applies in that period
-- Ontario statutory public holidays (`exceptPublicHolidays`) and seasonal/month/day calendars from the pipeline schedule object
-- Rules with `status: failed` always appear on the map with a warning (never treated as active); toggle **Show rules without schedule data** only affects features missing a `schedule` property
-- `partial` schedules match on parsed windows only, with a “Partially parsed” note when unparsed clauses remain
-- Click the map to list bylaws near that point; click a single segment for a quick popup
-- Search by address (Google Places autocomplete) to fly to a location and highlight nearby curb segments
-- Legend with segment counts for the selected time period
+- Full-screen mobile UI with floating location, time, and GPS controls (same chrome on desktop, max-width column)
+- Zoom-gated curb lines (appear around zoom 14.5+) with severity-ordered coloring: allowed, unclear, restricted
+- Viewport-subset schedule evaluation via a spatial index (avoids re-serializing the whole city on every time change)
+- Composed curb-side verdict from all locally overlapping rules: parking allowed, not allowed, likely allowed, or schedule unclear
+- Time query defaults to **Now** with duration chips (30m / 1h / 2h / 3h); midnight-crossing durations are truncated and disclosed
+- Prominent max-stay warnings when the requested duration exceeds `maxMinutes`
+- Search (Google Places), GPS, and map taps all feed the same nearest-curb selection flow with a curb-side switcher
+- Local recents and favorites (coordinates + labels only); GPS permission only after first explicit use, then auto-locate when already granted
+- Every verdict includes “Check posted signs.”
 
 Schedule logic lives under [`src/lib/schedule/`](src/lib/schedule/) and mirrors the parking-pipeline contract. Display text for bylaws still comes from the `Rule` property; filtering never regex-parses `Rule`.
 
