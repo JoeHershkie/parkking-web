@@ -35,3 +35,12 @@ export {
   slotToDateString,
 } from './slot'
 export { polarityLabel } from './labels'
+export {
+  composeCurbVerdict,
+  composeCurbVerdictForQuery,
+  type ComposeCurbVerdictOptions,
+  type ContributingRule,
+  type CurbVerdict,
+  type CurbVerdictStatus,
+  type RestrictionKind,
+} from './verdict'

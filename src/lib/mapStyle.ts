@@ -50,6 +50,15 @@ export const lineOpacityExpression = 0.85
 export const lineWidthExpression: ExpressionSpecification = [
   'case',
   ['boolean', ['feature-state', 'hover'], false],
-  4,
-  2,
+  5,
+  3,
 ]
+
+/** Higher sort-key draws on top: restrictions under allowed. */
+export const lineSortKeyExpression: ExpressionSpecification = [
+  'coalesce',
+  ['get', '_severity'],
+  0,
+]
+
+export const CURB_ZOOM_MIN = 14.5
