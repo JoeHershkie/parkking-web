@@ -152,6 +152,27 @@ export function ParkingMap({
 
     mapRef.current = map
 
+    const syncMapSize = () => {
+      map.resize()
+    }
+
+    // Shell is fixed to the layout / large viewport. Soft-keyboard visualViewport
+    // changes must not relayout the map (that makes the UI appear to slide up).
+    window.addEventListener('resize', syncMapSize)
+    window.addEventListener('orientationchange', syncMapSize)
+
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(() => syncMapSize())
+        : null
+    if (containerRef.current) {
+      resizeObserver?.observe(containerRef.current)
+    }
+
+    map.on('load', syncMapSize)
+    // Style load can change canvas layout after the first paint.
+    map.once('idle', syncMapSize)
+
     const applyHighlightFilter = () => {
       if (!map.getLayer(PARKING_HIGHLIGHT_LAYER_ID)) return
       const keys = highlightKeysRef.current
@@ -296,6 +317,9 @@ export function ParkingMap({
 
     return () => {
       cancelled = true
+      window.removeEventListener('resize', syncMapSize)
+      window.removeEventListener('orientationchange', syncMapSize)
+      resizeObserver?.disconnect()
       map.remove()
       mapRef.current = null
       indexRef.current = null

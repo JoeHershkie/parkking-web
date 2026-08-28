@@ -50,6 +50,7 @@ export function LocationSheet({
   const [error, setError] = useState<string | null>(null)
   const sessionRef = useRef(createSessionToken())
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -57,6 +58,15 @@ export function LocationSheet({
     setSuggestions([])
     setError(null)
     sessionRef.current = createSessionToken()
+  }, [open])
+
+  // Focus without scrolling the page — keeps the map stationary behind the sheet.
+  useEffect(() => {
+    if (!open) return
+    const id = window.requestAnimationFrame(() => {
+      inputRef.current?.focus({ preventScroll: true })
+    })
+    return () => window.cancelAnimationFrame(id)
   }, [open])
 
   const fetchSuggestions = useCallback(
@@ -129,6 +139,7 @@ export function LocationSheet({
             aria-hidden
           />
           <input
+            ref={inputRef}
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -136,9 +147,8 @@ export function LocationSheet({
               apiKey ? 'Search Toronto address…' : 'API key not configured'
             }
             disabled={!apiKey}
-            className="tap-target w-full rounded-xl border border-border bg-surface-muted py-2.5 pl-10 pr-10 text-sm text-ink placeholder:text-ink-subtle"
+            className="tap-target w-full rounded-xl border border-border bg-surface-muted py-2.5 pl-10 pr-10 text-base text-ink placeholder:text-ink-subtle"
             autoComplete="off"
-            autoFocus
           />
           {query ? (
             <button

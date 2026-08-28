@@ -95,7 +95,7 @@ export function TimeSheet({
                 onChange={(e) =>
                   setDraft((d) => ({ ...d, date: e.target.value }))
                 }
-                className="tap-target mt-1 w-full rounded-xl border border-border bg-surface-muted px-3 py-2 text-sm font-bold text-ink"
+                className="tap-target mt-1 w-full rounded-xl border border-border bg-surface-muted px-3 py-2 text-base font-bold text-ink"
               />
             </label>
             <label className="block text-[10px] font-extrabold uppercase tracking-wider text-ink-muted">
@@ -109,7 +109,7 @@ export function TimeSheet({
                     startMinute: timeValueToMinute(e.target.value),
                   }))
                 }
-                className="tap-target mt-1 w-full rounded-xl border border-border bg-surface-muted px-3 py-2 text-sm font-bold text-ink"
+                className="tap-target mt-1 w-full rounded-xl border border-border bg-surface-muted px-3 py-2 text-base font-bold text-ink"
               />
             </label>
           </div>
@@ -156,7 +156,7 @@ export function TimeSheet({
                     ),
                   }))
                 }
-                className="tap-target mt-1 w-full rounded-xl border border-border bg-surface-muted px-3 py-2 text-sm font-bold text-ink"
+                className="tap-target mt-1 w-full rounded-xl border border-border bg-surface-muted px-3 py-2 text-base font-bold text-ink"
               />
             </label>
           ) : (
