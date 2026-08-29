@@ -1,11 +1,16 @@
 .parking-map-wrap {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
-.parking-map {
-  position: absolute;
+.parking-map,
+.parking-map.maplibregl-map {
+  position: absolute !important;
   inset: 0;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .map-overlay-loading,

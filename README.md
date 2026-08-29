@@ -1,6 +1,6 @@
-# Toronto Parking Bylaws (parking-web)
+# Parkking Web (`parkking-web`)
 
-Mobile-first map of geocoded Toronto curb parking bylaws. Data is produced by the separate `parking-pipeline` project and loaded as static GeoJSON in this app.
+Mobile-first map of geocoded Toronto curb parking bylaws. Data is produced by the separate `parkking-pipeline` project and loaded as static GeoJSON in this app.
 
 ## Prerequisites
 
@@ -8,7 +8,7 @@ Mobile-first map of geocoded Toronto curb parking bylaws. Data is produced by th
 - Map data: copy `final_parking_map.geojson` from the pipeline repo into this project:
 
 ```bash
-cp ../parking-pipeline/data/final_parking_map.geojson public/data/
+cp ../parkking-pipeline/data/final_parking_map.geojson public/data/
 ```
 
 GeoJSON files under `public/data/` are gitignored; refresh the copy whenever you re-run the pipeline fullrun so features include structured `schedule` objects (`v: 1`).

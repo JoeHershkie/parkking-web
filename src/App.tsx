@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LocationSheet, type PlacePick } from './components/LocationSheet'
-import { MapKey } from './components/MapKey'
 import {
   ParkingMap,
   type ParkingMapHandle,
@@ -47,7 +46,6 @@ type SelectionState = {
 function App() {
   const mapHandleRef = useRef<ParkingMapHandle | null>(null)
   const [dataReady, setDataReady] = useState(false)
-  const [visibleCount, setVisibleCount] = useState<number | null>(null)
   const [locationOpen, setLocationOpen] = useState(false)
   const [timeOpen, setTimeOpen] = useState(false)
   const [locationLabel, setLocationLabel] = useState('Search or tap the map')
@@ -83,12 +81,11 @@ function App() {
   }, [timeQuery.mode])
 
   const applyMapFilter = useCallback(() => {
-    const count = mapHandleRef.current?.applyScheduleFilter(
+    mapHandleRef.current?.applyScheduleFilter(
       resolved.slot,
       resolved.effectiveEndMinute,
       true,
     )
-    if (count != null) setVisibleCount(count)
   }, [resolved])
 
   useEffect(() => {
@@ -223,7 +220,7 @@ function App() {
   }, [])
 
   return (
-    <div className="relative h-[100dvh] w-screen overflow-hidden bg-slate-900">
+    <div className="app-shell">
       <div className="absolute inset-0">
         <ParkingMap
           onMapReady={handleMapReady}
@@ -249,8 +246,6 @@ function App() {
           </p>
         </div>
       )}
-
-      <MapKey visibleCount={visibleCount} />
 
       <VerdictSheet
         visible={selection != null}
