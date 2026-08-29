@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import maplibregl, { type MapLayerMouseEvent } from 'maplibre-gl'
 import { BASE_MAP_STYLE_URL } from '../lib/basemap'
+import { loadCachedGeoJSON } from '../lib/cache'
 import {
   CURB_ZOOM_MIN,
   lineColorExpression,
@@ -36,7 +37,12 @@ export interface ParkingMapHandle {
   getIndex: () => ParkingSpatialIndex | null
   clearHighlight: () => void
   setHighlightKeys: (keys: string[]) => void
-  flyTo: (lng: number, lat: number, zoom?: number) => Promise<void>
+  flyTo: (
+    lng: number,
+    lat: number,
+    zoom?: number,
+    options?: { offsetFraction?: number },
+  ) => Promise<void>
   applyScheduleFilter: (
     slot: Slot,
     endMinuteOfDay: number | null,
@@ -50,6 +56,8 @@ interface ParkingMapProps {
   onDataLoaded: (data: ParkingFeatureCollection) => void
   onPointSelected: (lngLat: [number, number]) => void
   onZoomChange?: (zoom: number, curbVisible: boolean) => void
+  userPosition?: { lng: number; lat: number } | null
+  searchPin?: { lng: number; lat: number; label?: string } | null
 }
 
 function mapBoundsToBBox(map: maplibregl.Map): BBox {
@@ -105,14 +113,48 @@ function addParkingLayers(map: maplibregl.Map) {
   })
 }
 
+function createUserLocationElement(): HTMLDivElement {
+  const el = document.createElement('div')
+  el.className = 'user-location-marker'
+  el.innerHTML = '<div class="user-location-halo"></div><div class="user-location-dot"></div>'
+  return el
+}
+
+function createSearchPinElement(label?: string): HTMLDivElement {
+  const el = document.createElement('div')
+  el.className = 'apple-search-pin-marker'
+  el.innerHTML = `
+    <div class="apple-search-pin-balloon">
+      <svg width="42" height="50" viewBox="0 0 42 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="applePinGrad" x1="21" y1="0" x2="21" y2="46" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#FF386B"/>
+            <stop offset="1" stop-color="#E51950"/>
+          </linearGradient>
+        </defs>
+        <path d="M21 1C10.5066 1 2 9.50659 2 20C2 28.5 12 38.5 20.1 46.2C20.6 46.7 21.4 46.7 21.9 46.2C30 38.5 40 28.5 40 20C40 9.50659 31.4934 1 21 1Z" fill="url(#applePinGrad)" stroke="#FFFFFF" stroke-width="2"/>
+        <circle cx="21" cy="18" r="5.5" fill="white"/>
+        <path d="M19.5 22L20.5 30H21.5L22.5 22H19.5Z" fill="white"/>
+      </svg>
+      <div class="apple-search-pin-ground-dot"></div>
+    </div>
+    ${label ? `<div class="apple-search-pin-label">${label}</div>` : ''}
+  `
+  return el
+}
+
 export function ParkingMap({
   onMapReady,
   onDataLoaded,
   onPointSelected,
   onZoomChange,
+  userPosition,
+  searchPin,
 }: ParkingMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
+  const userMarkerRef = useRef<maplibregl.Marker | null>(null)
+  const searchPinMarkerRef = useRef<maplibregl.Marker | null>(null)
   const indexRef = useRef<ParkingSpatialIndex | null>(null)
   const filterRef = useRef<{
     slot: Slot
@@ -128,12 +170,66 @@ export function ParkingMap({
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>(
     'loading',
   )
+  const [loadingText, setLoadingText] = useState('Loading curb rules…')
   const [loadError, setLoadError] = useState<string | null>(null)
 
-  onMapReadyRef.current = onMapReady
-  onDataLoadedRef.current = onDataLoaded
-  onPointSelectedRef.current = onPointSelected
-  onZoomChangeRef.current = onZoomChange
+  useEffect(() => {
+    onMapReadyRef.current = onMapReady
+    onDataLoadedRef.current = onDataLoaded
+    onPointSelectedRef.current = onPointSelected
+    onZoomChangeRef.current = onZoomChange
+  }, [onMapReady, onDataLoaded, onPointSelected, onZoomChange])
+
+  // Sync user location marker (Apple Maps style blue dot)
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    if (!userPosition) {
+      if (userMarkerRef.current) {
+        userMarkerRef.current.remove()
+        userMarkerRef.current = null
+      }
+      return
+    }
+
+    if (!userMarkerRef.current) {
+      const el = createUserLocationElement()
+      userMarkerRef.current = new maplibregl.Marker({ element: el })
+        .setLngLat([userPosition.lng, userPosition.lat])
+        .addTo(map)
+    } else {
+      userMarkerRef.current.setLngLat([userPosition.lng, userPosition.lat])
+    }
+  }, [userPosition])
+
+  // Sync searched location pin (Apple Maps pink balloon pin)
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    if (!searchPin) {
+      if (searchPinMarkerRef.current) {
+        searchPinMarkerRef.current.remove()
+        searchPinMarkerRef.current = null
+      }
+      return
+    }
+
+    if (searchPinMarkerRef.current) {
+      searchPinMarkerRef.current.remove()
+      searchPinMarkerRef.current = null
+    }
+
+    const el = createSearchPinElement(searchPin.label)
+    searchPinMarkerRef.current = new maplibregl.Marker({
+      element: el,
+      anchor: 'bottom',
+      offset: [0, 8],
+    })
+      .setLngLat([searchPin.lng, searchPin.lat])
+      .addTo(map)
+  }, [searchPin])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -156,8 +252,6 @@ export function ParkingMap({
       map.resize()
     }
 
-    // Shell is fixed to the layout / large viewport. Soft-keyboard visualViewport
-    // changes must not relayout the map (that makes the UI appear to slide up).
     window.addEventListener('resize', syncMapSize)
     window.addEventListener('orientationchange', syncMapSize)
 
@@ -170,7 +264,6 @@ export function ParkingMap({
     }
 
     map.on('load', syncMapSize)
-    // Style load can change canvas layout after the first paint.
     map.once('idle', syncMapSize)
 
     const applyHighlightFilter = () => {
@@ -231,7 +324,12 @@ export function ParkingMap({
       getIndex: () => indexRef.current,
       clearHighlight: () => setHighlightKeys([]),
       setHighlightKeys,
-      flyTo: (lng, lat, zoom = 17) =>
+      flyTo: (
+        lng: number,
+        lat: number,
+        zoom = 17,
+        options?: { offsetFraction?: number },
+      ) =>
         new Promise((resolve) => {
           const onMoveEnd = () => {
             map.off('moveend', onMoveEnd)
@@ -239,7 +337,20 @@ export function ParkingMap({
             resolve()
           }
           map.once('moveend', onMoveEnd)
-          map.flyTo({ center: [lng, lat], zoom, duration: 800 })
+
+          // Position target point at ~2/3 of viewport height (1/3 down from top)
+          const fraction = options?.offsetFraction ?? 0.167
+          const containerHeight =
+            map.getContainer()?.clientHeight ||
+            (typeof window !== 'undefined' ? window.innerHeight : 800)
+          const offsetY = Math.round(containerHeight * fraction)
+
+          map.flyTo({
+            center: [lng, lat],
+            zoom,
+            offset: [0, -offsetY],
+            duration: 800,
+          })
         }),
       applyScheduleFilter,
       refreshViewport,
@@ -254,13 +365,7 @@ export function ParkingMap({
 
     map.on('load', async () => {
       try {
-        const res = await fetch(GEOJSON_URL)
-        if (!res.ok) {
-          setLoadError(`HTTP ${res.status}`)
-          setLoadState('error')
-          return
-        }
-        const data = (await res.json()) as ParkingFeatureCollection
+        const data = await loadCachedGeoJSON(GEOJSON_URL, (msg) => setLoadingText(msg))
         if (cancelled || mapRef.current !== map) return
         indexRef.current = new ParkingSpatialIndex(data)
         addParkingLayers(map)
@@ -317,6 +422,14 @@ export function ParkingMap({
 
     return () => {
       cancelled = true
+      if (userMarkerRef.current) {
+        userMarkerRef.current.remove()
+        userMarkerRef.current = null
+      }
+      if (searchPinMarkerRef.current) {
+        searchPinMarkerRef.current.remove()
+        searchPinMarkerRef.current = null
+      }
       window.removeEventListener('resize', syncMapSize)
       window.removeEventListener('orientationchange', syncMapSize)
       resizeObserver?.disconnect()
@@ -331,7 +444,7 @@ export function ParkingMap({
       <div ref={containerRef} className="parking-map" />
       {loadState === 'loading' && (
         <div className="map-overlay map-overlay-loading" role="status">
-          Loading curb rules…
+          {loadingText}
         </div>
       )}
       {loadState === 'error' && (

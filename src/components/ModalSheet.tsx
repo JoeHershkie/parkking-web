@@ -4,7 +4,9 @@ import { useVisualViewport } from '../hooks/useVisualViewport'
 
 type SheetProps = {
   open: boolean
-  title: string
+  title?: string
+  hideHeader?: boolean
+  fullscreen?: boolean
   onClose: () => void
   children: ReactNode
   /** bottom sheet (default) or centered modal */
@@ -13,7 +15,9 @@ type SheetProps = {
 
 export function ModalSheet({
   open,
-  title,
+  title = '',
+  hideHeader = false,
+  fullscreen = false,
   onClose,
   children,
   variant = 'bottom',
@@ -69,7 +73,10 @@ export function ModalSheet({
   const sheetStyle: CSSProperties = fillToKeyboard
     ? { maxHeight: 'none' }
     : variant === 'bottom'
-      ? { maxHeight: Math.max(160, layoutHeight * 0.88) }
+      ? {
+          height: fullscreen ? 'calc(100dvh - 3.25rem)' : undefined,
+          maxHeight: fullscreen ? 'calc(100dvh - 3.25rem)' : Math.max(160, layoutHeight * 0.88),
+        }
       : {
           maxHeight: Math.max(160, viewport.height * 0.88),
           ...(keyboardOpen
@@ -92,14 +99,14 @@ export function ModalSheet({
     >
       <button
         type="button"
-        className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]"
         aria-label="Close"
         onClick={onClose}
       />
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-label={title || 'Dialog'}
         style={sheetStyle}
         className={`z-10 flex w-full max-w-[var(--overlay-max)] flex-col overflow-hidden bg-surface text-ink shadow-sheet ${
           fillToKeyboard
@@ -109,24 +116,30 @@ export function ModalSheet({
               : 'relative mx-4 rounded-[var(--radius-sheet)] border border-border shadow-float'
         }`}
       >
-        <div className="relative flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-3 safe-pad-top">
-          {variant === 'bottom' && !fillToKeyboard && (
-            <div className="absolute left-1/2 top-2 h-1.5 w-10 -translate-x-1/2 rounded-full bg-border-strong" />
-          )}
-          <h2 className="pt-1 text-base font-extrabold text-ink">{title}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="tap-target inline-flex items-center justify-center rounded-full bg-surface-muted text-ink-muted hover:bg-border"
-            aria-label="Close dialog"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+        {!hideHeader ? (
+          <div className="relative flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-3 safe-pad-top">
+            {variant === 'bottom' && !fillToKeyboard && (
+              <div className="absolute left-1/2 top-2 h-1 w-9 -translate-x-1/2 rounded-full bg-slate-300" />
+            )}
+            <h2 className="pt-1 text-base font-extrabold text-ink">{title}</h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="tap-target inline-flex items-center justify-center rounded-full bg-surface-muted text-ink-muted hover:bg-border"
+              aria-label="Close dialog"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex shrink-0 justify-center pt-2.5 pb-1">
+            <div className="h-1 w-9 rounded-full bg-slate-300" />
+          </div>
+        )}
         <div
-          className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 ${
-            fillToKeyboard ? 'pb-3' : 'safe-pad-bottom'
-          }`}
+          className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 ${
+            hideHeader ? 'pt-1 pb-3' : 'py-3'
+          } ${fillToKeyboard ? 'pb-3' : 'safe-pad-bottom'}`}
         >
           {children}
         </div>

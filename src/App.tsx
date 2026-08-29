@@ -7,11 +7,13 @@ import {
 import { TimeSheet } from './components/TimeSheet'
 import { TopControls } from './components/TopControls'
 import { VerdictSheet } from './components/VerdictSheet'
+import { getSheetTargetHeight } from './lib/sheetDetents'
 import { useGeolocation } from './hooks/useGeolocation'
 import {
   selectNearestCurb,
   type CurbSideGroup,
 } from './lib/curbSelection'
+import { formatShortAddress } from './lib/places'
 import {
   addFavorite,
   addRecent,
@@ -25,7 +27,6 @@ import {
 } from './lib/savedLocations'
 import {
   composeCurbVerdictForQuery,
-  type CurbVerdict,
 } from './lib/schedule'
 import {
   createNowTimeQuery,
@@ -33,8 +34,6 @@ import {
   resolveTimeQuery,
   type TimeQuery,
 } from './lib/timeQuery'
-import type { ParkingFeatureCollection } from './types/parking'
-// Mobile-first shell: full-screen map + floating chrome (no App.css document layout).
 
 type SelectionState = {
   point: { lng: number; lat: number }
@@ -50,7 +49,6 @@ function App() {
   const [timeOpen, setTimeOpen] = useState(false)
   const [locationLabel, setLocationLabel] = useState('Search or tap the map')
   const [selection, setSelection] = useState<SelectionState | null>(null)
-  const [verdict, setVerdict] = useState<CurbVerdict | null>(null)
   const [timeQuery, setTimeQuery] = useState<TimeQuery>(() =>
     createNowTimeQuery(60, 60),
   )
@@ -93,40 +91,45 @@ function App() {
     applyMapFilter()
   }, [dataReady, applyMapFilter])
 
-  const recomputeVerdict = useCallback(
-    (groups: CurbSideGroup[], groupKey: string | null) => {
-      const selected =
-        (groupKey && groups.find((g) => g.groupKey === groupKey)) ||
-        groups[0] ||
-        null
+  const verdict = useMemo(() => {
+    if (!selection) return null
+    const { groups, selectedGroupKey } = selection
+    const selected =
+      (selectedGroupKey && groups.find((g) => g.groupKey === selectedGroupKey)) ||
+      groups[0] ||
+      null
 
-      if (!selected) {
-        setVerdict(
-          composeCurbVerdictForQuery([], resolved, {
-            street: null,
-            side: null,
-            sideDisplay: null,
-          }),
-        )
-        mapHandleRef.current?.clearHighlight()
-        return
-      }
-
-      const next = composeCurbVerdictForQuery(selected.features, resolved, {
-        street: selected.street,
-        side: selected.side,
-        sideDisplay: selected.sideDisplay,
+    if (!selected) {
+      return composeCurbVerdictForQuery([], resolved, {
+        street: null,
+        side: null,
+        sideDisplay: null,
       })
-      setVerdict(next)
-      mapHandleRef.current?.setHighlightKeys(selected.featureKeys)
-    },
-    [resolved],
-  )
+    }
+
+    return composeCurbVerdictForQuery(selected.features, resolved, {
+      street: selected.street,
+      side: selected.side,
+      sideDisplay: selected.sideDisplay,
+    })
+  }, [selection, resolved])
 
   useEffect(() => {
-    if (!selection) return
-    recomputeVerdict(selection.groups, selection.selectedGroupKey)
-  }, [selection, resolved, recomputeVerdict])
+    if (!selection) {
+      mapHandleRef.current?.clearHighlight()
+      return
+    }
+    const { groups, selectedGroupKey } = selection
+    const selected =
+      (selectedGroupKey && groups.find((g) => g.groupKey === selectedGroupKey)) ||
+      groups[0] ||
+      null
+    if (selected) {
+      mapHandleRef.current?.setHighlightKeys(selected.featureKeys)
+    } else {
+      mapHandleRef.current?.clearHighlight()
+    }
+  }, [selection])
 
   const selectAtPoint = useCallback(
     async (
@@ -149,21 +152,22 @@ function App() {
         { preferredGroupKey: options?.preferredGroupKey },
       )
 
+      const shortLabel = label ? formatShortAddress(label) : null
       const displayLabel =
-        label ??
+        shortLabel ??
         result.selected?.street ??
         `${lat.toFixed(5)}°N, ${Math.abs(lng).toFixed(5)}°W`
 
       setLocationLabel(displayLabel)
       setSelection({
         point: { lng, lat },
-        label,
+        label: displayLabel,
         groups: result.groups,
         selectedGroupKey: result.selectedGroupKey,
       })
 
       if (label) {
-        setRecents(addRecent({ label, lat, lng }))
+        setRecents(addRecent({ label: displayLabel, lat, lng }))
       }
     },
     [],
@@ -173,7 +177,7 @@ function App() {
     mapHandleRef.current = handle
   }, [])
 
-  const handleDataLoaded = useCallback((_data: ParkingFeatureCollection) => {
+  const handleDataLoaded = useCallback(() => {
     setDataReady(true)
   }, [])
 
@@ -219,6 +223,14 @@ function App() {
     return `${place.lat.toFixed(5)},${place.lng.toFixed(5)}|${place.label}`
   }, [])
 
+  const isTrackingLocation = useMemo(() => {
+    if (!geo.position) return false
+    if (!selection) return true
+    const dLat = Math.abs(selection.point.lat - geo.position.lat)
+    const dLng = Math.abs(selection.point.lng - geo.position.lng)
+    return dLat < 0.0004 && dLng < 0.0004
+  }, [geo.position, selection])
+
   return (
     <div className="app-shell">
       <div className="absolute inset-0">
@@ -226,26 +238,39 @@ function App() {
           onMapReady={handleMapReady}
           onDataLoaded={handleDataLoaded}
           onPointSelected={handlePointSelected}
+          userPosition={geo.position ? { lng: geo.position.lng, lat: geo.position.lat } : null}
+          searchPin={
+            selection
+              ? {
+                  lng: selection.point.lng,
+                  lat: selection.point.lat,
+                  label: selection.label ?? undefined,
+                }
+              : null
+          }
         />
       </div>
 
       <TopControls
         locationLabel={locationLabel}
         timeLabel={timeChip}
+        offsetY={
+          selection != null
+            ? getSheetTargetHeight(
+                'peek',
+                typeof window !== 'undefined' ? window.innerHeight : 800,
+              )
+            : 0
+        }
+        hasLocation={Boolean(geo.position || geo.status === 'granted')}
+        isTrackingLocation={isTrackingLocation}
         onOpenLocation={() => setLocationOpen(true)}
         onOpenTime={() => setTimeOpen(true)}
         onLocate={() => void handleLocate()}
         locating={geo.status === 'prompting' || geo.status === 'locating'}
         disabled={!dataReady}
+        errorMessage={geo.errorMessage ?? (geo.status === 'denied' ? 'Location permission denied.' : null)}
       />
-
-      {(geo.errorMessage || geo.status === 'denied') && (
-        <div className="pointer-events-none absolute inset-x-0 top-[4.75rem] z-20 safe-pad-x">
-          <p className="pointer-events-auto mx-auto max-w-[var(--overlay-max)] rounded-xl border border-status-restricted/30 bg-status-restricted-soft px-3 py-2 text-xs font-semibold text-status-restricted">
-            {geo.errorMessage ?? 'Location permission denied.'}
-          </p>
-        </div>
-      )}
 
       <VerdictSheet
         visible={selection != null}
@@ -253,6 +278,9 @@ function App() {
         groups={selection?.groups ?? []}
         selectedGroupKey={selection?.selectedGroupKey ?? null}
         onSelectGroup={handleSelectGroup}
+        onClose={() => setSelection(null)}
+        onOpenLocation={() => setLocationOpen(true)}
+        onOpenTime={() => setTimeOpen(true)}
         resolved={resolved}
       />
 
