@@ -177,7 +177,12 @@ export function VerdictSheet({
         {announcement}
       </div>
 
-      <BottomSheet open={visible} detent={detent} onDetentChange={setDetent}>
+      <BottomSheet
+        open={visible}
+        detent={detent}
+        onDetentChange={setDetent}
+        onClose={onClose}
+      >
         <div className="space-y-2.5">
           {/* Header Summary */}
           <div className="flex items-start justify-between gap-2">

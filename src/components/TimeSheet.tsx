@@ -66,13 +66,13 @@ function TimeSheetForm({
   }
 
   return (
-    <div className="space-y-4 pt-1">
+    <div className="space-y-4 pb-2">
       {/* iOS Segmented Control */}
-      <div className="flex rounded-xl bg-slate-200/70 p-1">
+      <div className="flex rounded-full bg-slate-200/70 p-1">
         <button
           type="button"
           onClick={() => setDraft((d) => ({ ...d, mode: 'now' }))}
-          className={`tap-target flex-1 rounded-lg py-1.5 text-xs font-bold transition ${
+          className={`tap-target flex-1 rounded-full py-1.5 text-xs font-bold transition ${
             draft.mode === 'now'
               ? 'bg-white text-slate-900 shadow-sm'
               : 'text-slate-600 hover:text-slate-900'
@@ -83,7 +83,7 @@ function TimeSheetForm({
         <button
           type="button"
           onClick={() => setDraft((d) => ({ ...d, mode: 'custom' }))}
-          className={`tap-target flex-1 rounded-lg py-1.5 text-xs font-bold transition ${
+          className={`tap-target flex-1 rounded-full py-1.5 text-xs font-bold transition ${
             draft.mode === 'custom'
               ? 'bg-white text-slate-900 shadow-sm'
               : 'text-slate-600 hover:text-slate-900'
@@ -139,7 +139,7 @@ function TimeSheetForm({
                 key={mins}
                 type="button"
                 onClick={() => setPreset(mins)}
-                className={`tap-target rounded-xl border py-2.5 text-xs font-bold transition ${
+                className={`tap-target rounded-full border py-2.5 text-xs font-bold transition ${
                   selected
                     ? 'border-brand bg-brand/10 text-brand ring-1 ring-brand'
                     : 'border-border bg-surface text-ink hover:bg-surface-muted'
@@ -197,7 +197,7 @@ function TimeSheetForm({
       <button
         type="button"
         onClick={handleApply}
-        className="tap-target mt-2 w-full rounded-xl bg-brand py-3 text-sm font-bold text-white shadow-md shadow-brand/20 transition active:scale-[0.99]"
+        className="tap-target mt-2 w-full rounded-full bg-brand py-3 text-sm font-bold text-white shadow-md shadow-brand/20 transition active:scale-[0.99]"
       >
         Apply
       </button>
@@ -213,7 +213,7 @@ export function TimeSheet({
   midnightPreview,
 }: TimeSheetProps) {
   return (
-    <ModalSheet open={open} title="Time" onClose={onClose} variant="bottom">
+    <ModalSheet open={open} hideHeader={true} onClose={onClose} variant="bottom">
       {open && (
         <TimeSheetForm
           query={query}

@@ -87,4 +87,101 @@ describe('curbSelection', () => {
       expect(preferred.selectedGroupKey).toBe(other.groupKey)
     }
   })
+
+  it('correctly handles MultiLineString features applying to Both sides', () => {
+    const bothSidesLine: ParkingFeature = {
+      type: 'Feature',
+      geometry: {
+        type: 'MultiLineString',
+        coordinates: [
+          [[-79.4, 43.6501], [-79.401, 43.6501]], // North side strip
+          [[-79.4, 43.6499], [-79.401, 43.6499]], // South side strip
+        ],
+      },
+      properties: {
+        Highway: 'Dual Side St',
+        Rule: 'Anytime',
+        schedule_category: 'no_parking',
+        Side: 'Both',
+        max: null,
+      },
+    }
+
+    // Tapping near the North strip
+    const resNorth = selectNearestCurb([bothSidesLine], {
+      lng: -79.4005,
+      lat: 43.65012,
+    })
+    expect(resNorth.selected).toBeTruthy()
+    expect(resNorth.selected!.street).toBe('Dual Side St')
+    expect(resNorth.selected!.sideDisplay).toBe('Both')
+
+    // Tapping near the South strip
+    const resSouth = selectNearestCurb([bothSidesLine], {
+      lng: -79.4005,
+      lat: 43.64988,
+    })
+    expect(resSouth.selected).toBeTruthy()
+    expect(resSouth.selected!.street).toBe('Dual Side St')
+    expect(resSouth.selected!.sideDisplay).toBe('Both')
+  })
+
+  it('keeps co-located rules on the same curb segment while isolating adjacent corner segments', () => {
+    // 70m mid-block line with 2 overlapping rules (rush-hour limit + pay & display)
+    const midblockRushHour = line(
+      'College St',
+      'North',
+      [
+        [-79.4079, 43.6565],
+        [-79.4087, 43.6563],
+      ],
+      'rush hour stopping',
+    )
+    const midblockMeter = line(
+      'College St',
+      'North',
+      [
+        [-79.4079, 43.6565],
+        [-79.4087, 43.6563],
+      ],
+      'pay and display',
+    )
+    // 15m corner segment starting 30m away
+    const cornerAnytime = line(
+      'College St',
+      'North',
+      [
+        [-79.4088, 43.6563],
+        [-79.409, 43.6562],
+      ],
+      'anytime no stopping',
+    )
+
+    const allFeatures = [midblockRushHour, midblockMeter, cornerAnytime]
+
+    // 1. Tapping mid-block (near -79.4083, 43.6564)
+    const midblockTap = selectNearestCurb(allFeatures, {
+      lng: -79.4083,
+      lat: 43.65642,
+    })
+    expect(midblockTap.selected).toBeTruthy()
+    expect(midblockTap.selected!.features.length).toBe(2)
+    const midblockRules = midblockTap.selected!.features.map(
+      (f) => f.properties.Rule,
+    )
+    expect(midblockRules).toContain('rush hour stopping')
+    expect(midblockRules).toContain('pay and display')
+    expect(midblockRules).not.toContain('anytime no stopping')
+
+    // 2. Tapping corner (near -79.4089, 43.65625)
+    const cornerTap = selectNearestCurb(allFeatures, {
+      lng: -79.4089,
+      lat: 43.65626,
+    })
+    expect(cornerTap.selected).toBeTruthy()
+    const cornerRules = cornerTap.selected!.features.map(
+      (f) => f.properties.Rule,
+    )
+    expect(cornerRules).toContain('anytime no stopping')
+  })
 })

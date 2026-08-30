@@ -1,10 +1,15 @@
 import {
   useCallback,
+  useEffect,
   useRef,
   useState,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
-  type TouchEvent as ReactTouchEvent,
 } from 'react'
+import {
+  computeSheetDragState,
+  resolveSheetRelease,
+} from '../lib/sheetGestures'
 import { getSheetTargetHeight, type SheetDetent } from '../lib/sheetDetents'
 
 export type { SheetDetent }
@@ -21,13 +26,51 @@ export function BottomSheet({
   open,
   detent,
   onDetentChange,
+  onClose,
   children,
 }: BottomSheetProps) {
+  const [prevOpen, setPrevOpen] = useState(open)
+  const [shouldRender, setShouldRender] = useState(open)
+  const [isEntering, setIsEntering] = useState(open)
+  const [isExiting, setIsExiting] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
-  const [dragOffset, setDragOffset] = useState(0)
-  const touchStartY = useRef(0)
-  const touchStartTime = useRef(0)
+  const [dragY, setDragY] = useState(0)
+  const pointerStartY = useRef(0)
+  const pointerStartTime = useRef(0)
+  const isPointerDownRef = useRef(false)
   const sheetRef = useRef<HTMLDivElement>(null)
+
+  if (open !== prevOpen) {
+    setPrevOpen(open)
+    if (open) {
+      setShouldRender(true)
+      setIsExiting(false)
+      setIsEntering(true)
+    } else {
+      setIsExiting(true)
+      setIsDragging(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!isEntering) return
+    const raf1 = requestAnimationFrame(() => {
+      const raf2 = requestAnimationFrame(() => {
+        setIsEntering(false)
+      })
+      return () => cancelAnimationFrame(raf2)
+    })
+    return () => cancelAnimationFrame(raf1)
+  }, [isEntering])
+
+  useEffect(() => {
+    if (!isExiting) return
+    const timer = window.setTimeout(() => {
+      setShouldRender(false)
+      setIsExiting(false)
+    }, 320)
+    return () => clearTimeout(timer)
+  }, [isExiting])
 
   const getTargetHeight = useCallback(
     (targetDetent: SheetDetent): number => {
@@ -38,104 +81,124 @@ export function BottomSheet({
   )
 
   const currentTargetHeight = getTargetHeight(detent)
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800
 
-  const handleTouchStart = (e: ReactTouchEvent<HTMLDivElement>) => {
-    touchStartY.current = e.touches[0].clientY
-    touchStartTime.current = Date.now()
-    setIsDragging(true)
-    setDragOffset(0)
-  }
-
-  const handleTouchMove = (e: ReactTouchEvent<HTMLDivElement>) => {
-    if (!isDragging) return
-    const deltaY = touchStartY.current - e.touches[0].clientY
-    let adjusted = deltaY
-    const maxH = getTargetHeight('expanded')
-    const minH = getTargetHeight('peek')
-    const proposed = currentTargetHeight + deltaY
-
-    if (proposed > maxH) {
-      adjusted = maxH - currentTargetHeight + (proposed - maxH) * 0.25
-    } else if (proposed < minH) {
-      adjusted = minH - currentTargetHeight + (proposed - minH) * 0.25
+  const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {
+      // ignore
     }
-
-    setDragOffset(adjusted)
+    isPointerDownRef.current = true
+    pointerStartY.current = e.clientY
+    pointerStartTime.current = Date.now()
+    setIsDragging(true)
+    setDragY(0)
   }
 
-  const handleTouchEnd = () => {
-    if (!isDragging) return
+  const handlePointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!isPointerDownRef.current) return
+    const deltaY = e.clientY - pointerStartY.current
+    setDragY(deltaY)
+  }
+
+  const handlePointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!isPointerDownRef.current) return
+    isPointerDownRef.current = false
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {
+      // ignore
+    }
     setIsDragging(false)
 
-    const finalHeight = currentTargetHeight + dragOffset
-    const dt = Math.max(1, Date.now() - touchStartTime.current)
-    const velocity = dragOffset / dt // px/ms (positive = upwards swipe)
+    const deltaY = e.clientY - pointerStartY.current
+    const dt = Math.max(1, Date.now() - pointerStartTime.current)
+    const velocityDown = deltaY / dt
 
-    setDragOffset(0)
+    setDragY(0)
 
-    const peekH = getTargetHeight('peek')
-    const medH = getTargetHeight('medium')
-    const expH = getTargetHeight('expanded')
+    const result = resolveSheetRelease(
+      detent,
+      deltaY,
+      velocityDown,
+      vh,
+      Boolean(onClose),
+    )
 
-    // Fast flick handling
-    if (velocity > 0.45) {
-      if (detent === 'peek') onDetentChange('medium')
-      else if (detent === 'medium') onDetentChange('expanded')
-      return
-    } else if (velocity < -0.45) {
-      if (detent === 'expanded') onDetentChange('medium')
-      else if (detent === 'medium') onDetentChange('peek')
-      return
-    }
-
-    // Proximity snapping
-    const distToPeek = Math.abs(finalHeight - peekH)
-    const distToMed = Math.abs(finalHeight - medH)
-    const distToExp = Math.abs(finalHeight - expH)
-
-    if (distToPeek <= distToMed && distToPeek <= distToExp) {
-      onDetentChange('peek')
-    } else if (distToMed <= distToExp) {
-      onDetentChange('medium')
+    if (result.action === 'dismiss') {
+      onClose?.()
     } else {
-      onDetentChange('expanded')
+      onDetentChange(result.detent)
     }
   }
 
-  if (!open) return null
+  const handlePointerCancel = () => {
+    if (!isPointerDownRef.current) return
+    isPointerDownRef.current = false
+    setIsDragging(false)
+    setDragY(0)
+  }
 
-  const activeHeight = Math.max(200, currentTargetHeight + (isDragging ? dragOffset : 0))
+  if (!shouldRender) return null
+
+  const dragState = isDragging
+    ? computeSheetDragState(detent, dragY, vh, Boolean(onClose))
+    : { height: currentTargetHeight, translateY: 0 }
+
+  const isFullHeight = detent === 'expanded'
+
+  let currentTransform = 'translateY(0)'
+  if (isEntering || isExiting) {
+    currentTransform = 'translateY(calc(100% + 24px))'
+  } else if (dragState.translateY > 0) {
+    currentTransform = `translateY(${dragState.translateY}px)`
+  }
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center">
+    <div
+      className={`pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center transition-[padding] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+        isFullHeight ? 'p-0' : 'safe-pad-x'
+      }`}
+    >
       <div
         ref={sheetRef}
-        style={{ height: `${activeHeight}px` }}
-        className={`pointer-events-auto flex w-full max-w-[var(--overlay-max)] flex-col overflow-hidden rounded-t-[var(--radius-sheet)] ios-glass-sheet shadow-sheet ${
-          isDragging ? '' : 'transition-[height] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]'
+        style={{
+          height: `${dragState.height}px`,
+          transform: currentTransform,
+        }}
+        className={`pointer-events-auto flex w-full max-w-[var(--overlay-max)] flex-col overflow-hidden rounded-t-[var(--radius-sheet)] rounded-b-none border-b-0 shadow-sheet ${
+          isFullHeight ? 'ios-glass-sheet' : 'ios-glass-sheet-translucent'
+        } ${
+          isDragging
+            ? ''
+            : 'transition-[height,transform,background,backdrop-filter] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]'
         }`}
       >
         {/* Grab handle drag bar */}
         <div
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          onTouchCancel={handleTouchEnd}
-          className="flex shrink-0 cursor-grab touch-none flex-col items-center justify-center pt-2.5 pb-1 active:cursor-grabbing"
-          aria-label="Drag sheet"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
+          className="relative flex shrink-0 cursor-grab touch-none select-none flex-col items-center justify-center pt-2.5 pb-2 active:cursor-grabbing after:absolute after:inset-x-0 after:-top-2 after:-bottom-4 after:content-['']"
+          aria-label="Drag sheet to resize or dismiss"
           role="slider"
           aria-valuemin={0}
           aria-valuemax={2}
           aria-valuenow={detent === 'peek' ? 0 : detent === 'medium' ? 1 : 2}
         >
-          <div className="h-1.25 w-9 rounded-full bg-slate-300/80" />
+          <div className="pointer-events-none h-1.25 w-[54px] rounded-full bg-slate-300/80" />
         </div>
 
         {/* Content viewport */}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 safe-pad-x safe-pad-bottom pb-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 safe-pad-bottom pb-4">
           {children}
         </div>
       </div>
     </div>
   )
 }
+
+

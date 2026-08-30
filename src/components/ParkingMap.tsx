@@ -8,6 +8,11 @@ import {
   lineOpacityExpression,
   lineSortKeyExpression,
   lineWidthExpression,
+  selectedBorderColor,
+  selectedCasingOpacityExpression,
+  selectedCasingWidthExpression,
+  selectedLineOpacityExpression,
+  selectedLineWidthExpression,
 } from '../lib/mapStyle'
 import type { Slot } from '../lib/schedule'
 import {
@@ -17,6 +22,7 @@ import {
 } from '../lib/spatialIndex'
 import type { ParkingFeatureCollection } from '../types/parking'
 import {
+  PARKING_HIGHLIGHT_CASING_LAYER_ID,
   PARKING_HIGHLIGHT_LAYER_ID,
   PARKING_LAYER_ID,
   PARKING_SOURCE_ID,
@@ -77,6 +83,7 @@ function addParkingLayers(map: maplibregl.Map) {
     generateId: true,
   })
 
+  // Base parking lines
   map.addLayer({
     id: PARKING_LAYER_ID,
     type: 'line',
@@ -94,6 +101,25 @@ function addParkingLayers(map: maplibregl.Map) {
     },
   })
 
+  // Selected outline / casing (thin black outline, rendered under selected fill)
+  map.addLayer({
+    id: PARKING_HIGHLIGHT_CASING_LAYER_ID,
+    type: 'line',
+    source: PARKING_SOURCE_ID,
+    minzoom: CURB_ZOOM_MIN,
+    filter: HIDDEN_FILTER,
+    layout: {
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': selectedBorderColor,
+      'line-width': selectedCasingWidthExpression,
+      'line-opacity': selectedCasingOpacityExpression,
+    },
+  })
+
+  // Selected fill (verdict-colored stroke, rendered thicker than base line)
   map.addLayer({
     id: PARKING_HIGHLIGHT_LAYER_ID,
     type: 'line',
@@ -105,10 +131,9 @@ function addParkingLayers(map: maplibregl.Map) {
       'line-join': 'round',
     },
     paint: {
-      'line-color': '#0f172a',
-      'line-width': 10,
-      'line-opacity': 0.35,
-      'line-blur': 0.5,
+      'line-color': lineColorExpression,
+      'line-width': selectedLineWidthExpression,
+      'line-opacity': selectedLineOpacityExpression,
     },
   })
 }
@@ -267,17 +292,22 @@ export function ParkingMap({
     map.once('idle', syncMapSize)
 
     const applyHighlightFilter = () => {
-      if (!map.getLayer(PARKING_HIGHLIGHT_LAYER_ID)) return
       const keys = highlightKeysRef.current
-      if (keys.length === 0) {
-        map.setFilter(PARKING_HIGHLIGHT_LAYER_ID, HIDDEN_FILTER)
-        return
+      const filter: maplibregl.FilterSpecification =
+        keys.length === 0
+          ? HIDDEN_FILTER
+          : ([
+              'in',
+              ['get', '_featureKey'],
+              ['literal', keys],
+            ] as maplibregl.FilterSpecification)
+
+      if (map.getLayer(PARKING_HIGHLIGHT_CASING_LAYER_ID)) {
+        map.setFilter(PARKING_HIGHLIGHT_CASING_LAYER_ID, filter)
       }
-      map.setFilter(PARKING_HIGHLIGHT_LAYER_ID, [
-        'in',
-        ['get', '_featureKey'],
-        ['literal', keys],
-      ] as maplibregl.FilterSpecification)
+      if (map.getLayer(PARKING_HIGHLIGHT_LAYER_ID)) {
+        map.setFilter(PARKING_HIGHLIGHT_LAYER_ID, filter)
+      }
     }
 
     const refreshViewport = (): number | null => {
@@ -388,10 +418,10 @@ export function ParkingMap({
     })
     map.on('zoomend', emitZoom)
 
-    map.on('mouseenter', PARKING_LAYER_ID, () => {
+    const handleMouseEnter = () => {
       map.getCanvas().style.cursor = 'pointer'
-    })
-    map.on('mouseleave', PARKING_LAYER_ID, () => {
+    }
+    const handleMouseLeave = () => {
       map.getCanvas().style.cursor = ''
       if (hoveredIdRef.current != null) {
         map.setFeatureState(
@@ -400,7 +430,14 @@ export function ParkingMap({
         )
         hoveredIdRef.current = null
       }
-    })
+    }
+
+    map.on('mouseenter', PARKING_LAYER_ID, handleMouseEnter)
+    map.on('mouseleave', PARKING_LAYER_ID, handleMouseLeave)
+    map.on('mouseenter', PARKING_HIGHLIGHT_LAYER_ID, handleMouseEnter)
+    map.on('mouseleave', PARKING_HIGHLIGHT_LAYER_ID, handleMouseLeave)
+    map.on('mouseenter', PARKING_HIGHLIGHT_CASING_LAYER_ID, handleMouseEnter)
+    map.on('mouseleave', PARKING_HIGHLIGHT_CASING_LAYER_ID, handleMouseLeave)
 
     map.on('mousemove', PARKING_LAYER_ID, (e: MapLayerMouseEvent) => {
       if (!e.features?.length) return
