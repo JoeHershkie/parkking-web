@@ -19,6 +19,16 @@ export type PlaceLocation = {
   formattedAddress: string
 }
 
+export function formatShortAddress(address: string): string {
+  if (!address) return ''
+  const trimmed = address.trim()
+  const firstComma = trimmed.indexOf(',')
+  if (firstComma > 0) {
+    return trimmed.slice(0, firstComma).trim()
+  }
+  return trimmed
+}
+
 export function createSessionToken(): string {
   if (typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
@@ -99,7 +109,7 @@ export async function placeDetails(
   if (!apiKey) throw new Error('Google Maps API key is not configured')
 
   const resourceName = placeId.startsWith('places/')
-    ? placeId
+  ? placeId
     : `places/${placeId}`
 
   const url = new URL(`${PLACES_BASE}/${resourceName}`)

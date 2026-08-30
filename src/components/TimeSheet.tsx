@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   DURATION_PRESETS,
   formatDurationLabel,
@@ -27,18 +27,26 @@ function timeValueToMinute(value: string): number {
   return h * 60 + m
 }
 
-export function TimeSheet({
-  open,
-  onClose,
+function draftCrossesMidnight(draft: TimeQuery): boolean {
+  const start =
+    draft.mode === 'now'
+      ? new Date().getHours() * 60 + new Date().getMinutes()
+      : draft.startMinute
+  return start + draft.requestedDurationMinutes > 23 * 60 + 59
+}
+
+function TimeSheetForm({
   query,
+  onClose,
   onApply,
   midnightPreview,
-}: TimeSheetProps) {
+}: {
+  query: TimeQuery
+  onClose: () => void
+  onApply: (next: TimeQuery) => void
+  midnightPreview: boolean
+}) {
   const [draft, setDraft] = useState<TimeQuery>(query)
-
-  useEffect(() => {
-    if (open) setDraft(query)
-  }, [open, query])
 
   function setPreset(preset: DurationPreset) {
     if (preset === 'custom') {
@@ -58,140 +66,162 @@ export function TimeSheet({
   }
 
   return (
-    <ModalSheet open={open} title="Check time & duration" onClose={onClose} variant="center">
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setDraft((d) => ({ ...d, mode: 'now' }))}
-            className={`tap-target rounded-xl border px-3 py-2.5 text-sm font-extrabold transition ${
-              draft.mode === 'now'
-                ? 'border-brand bg-brand text-white'
-                : 'border-border bg-surface-muted text-ink'
-            }`}
-          >
-            Now
-          </button>
-          <button
-            type="button"
-            onClick={() => setDraft((d) => ({ ...d, mode: 'custom' }))}
-            className={`tap-target rounded-xl border px-3 py-2.5 text-sm font-extrabold transition ${
-              draft.mode === 'custom'
-                ? 'border-brand bg-brand text-white'
-                : 'border-border bg-surface-muted text-ink'
-            }`}
-          >
-            Custom
-          </button>
+    <div className="space-y-4 pt-1">
+      {/* iOS Segmented Control */}
+      <div className="flex rounded-xl bg-slate-200/70 p-1">
+        <button
+          type="button"
+          onClick={() => setDraft((d) => ({ ...d, mode: 'now' }))}
+          className={`tap-target flex-1 rounded-lg py-1.5 text-xs font-bold transition ${
+            draft.mode === 'now'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          Now
+        </button>
+        <button
+          type="button"
+          onClick={() => setDraft((d) => ({ ...d, mode: 'custom' }))}
+          className={`tap-target flex-1 rounded-lg py-1.5 text-xs font-bold transition ${
+            draft.mode === 'custom'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          Custom
+        </button>
+      </div>
+
+      {/* Custom date & time pickers */}
+      {draft.mode === 'custom' && (
+        <div className="grid grid-cols-2 gap-2.5">
+          <label className="block min-w-0 max-w-full text-[10px] font-bold uppercase tracking-wider text-ink-muted">
+            Date
+            <input
+              type="date"
+              value={draft.date}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, date: e.target.value }))
+              }
+              className="tap-target mt-1 w-full min-w-0 max-w-full rounded-xl border border-border bg-surface-muted px-2.5 py-2 text-base font-bold text-ink focus:outline-none focus:ring-2 focus:ring-brand/40"
+            />
+          </label>
+          <label className="block min-w-0 max-w-full text-[10px] font-bold uppercase tracking-wider text-ink-muted">
+            Start Time
+            <input
+              type="time"
+              value={minuteToTimeValue(draft.startMinute)}
+              onChange={(e) =>
+                setDraft((d) => ({
+                  ...d,
+                  startMinute: timeValueToMinute(e.target.value),
+                }))
+              }
+              className="tap-target mt-1 w-full min-w-0 max-w-full rounded-xl border border-border bg-surface-muted px-2.5 py-2 text-base font-bold text-ink focus:outline-none focus:ring-2 focus:ring-brand/40"
+            />
+          </label>
         </div>
+      )}
 
-        {draft.mode === 'custom' && (
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block text-[10px] font-extrabold uppercase tracking-wider text-ink-muted">
-              Date
-              <input
-                type="date"
-                value={draft.date}
-                onChange={(e) =>
-                  setDraft((d) => ({ ...d, date: e.target.value }))
-                }
-                className="tap-target mt-1 w-full rounded-xl border border-border bg-surface-muted px-3 py-2 text-base font-bold text-ink"
-              />
-            </label>
-            <label className="block text-[10px] font-extrabold uppercase tracking-wider text-ink-muted">
-              Start
-              <input
-                type="time"
-                value={minuteToTimeValue(draft.startMinute)}
-                onChange={(e) =>
-                  setDraft((d) => ({
-                    ...d,
-                    startMinute: timeValueToMinute(e.target.value),
-                  }))
-                }
-                className="tap-target mt-1 w-full rounded-xl border border-border bg-surface-muted px-3 py-2 text-base font-bold text-ink"
-              />
-            </label>
-          </div>
-        )}
-
-        <div>
-          <p className="mb-2 text-[10px] font-extrabold uppercase tracking-wider text-ink-muted">
-            Duration
-          </p>
-          <div className="grid grid-cols-4 gap-1.5">
-            {DURATION_PRESETS.map((mins) => (
+      {/* Duration chips */}
+      <div>
+        <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-ink-muted">
+          Duration
+        </p>
+        <div className="grid grid-cols-4 gap-2">
+          {DURATION_PRESETS.map((mins) => {
+            const selected =
+              draft.durationPreset === mins &&
+              draft.requestedDurationMinutes === mins
+            return (
               <button
                 key={mins}
                 type="button"
                 onClick={() => setPreset(mins)}
-                className={`tap-target rounded-xl border text-xs font-extrabold transition ${
-                  draft.durationPreset === mins
-                    ? 'border-brand bg-brand text-white'
-                    : 'border-border bg-surface-muted text-ink'
+                className={`tap-target rounded-xl border py-2.5 text-xs font-bold transition ${
+                  selected
+                    ? 'border-brand bg-brand/10 text-brand ring-1 ring-brand'
+                    : 'border-border bg-surface text-ink hover:bg-surface-muted'
                 }`}
               >
                 {formatDurationLabel(mins)}
               </button>
-            ))}
-          </div>
-          {draft.durationPreset === 'custom' ||
-          !DURATION_PRESETS.includes(
-            draft.requestedDurationMinutes as (typeof DURATION_PRESETS)[number],
-          ) ? (
-            <label className="mt-2 block text-[10px] font-extrabold uppercase tracking-wider text-ink-muted">
-              Custom minutes
-              <input
-                type="number"
-                min={1}
-                max={720}
-                value={draft.requestedDurationMinutes}
-                onChange={(e) =>
-                  setDraft((d) => ({
-                    ...d,
-                    durationPreset: 'custom',
-                    requestedDurationMinutes: Math.max(
-                      1,
-                      Number(e.target.value) || 1,
-                    ),
-                  }))
-                }
-                className="tap-target mt-1 w-full rounded-xl border border-border bg-surface-muted px-3 py-2 text-base font-bold text-ink"
-              />
-            </label>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setPreset('custom')}
-              className="mt-2 text-xs font-bold text-brand"
-            >
-              Custom duration…
-            </button>
-          )}
+            )
+          })}
         </div>
 
-        {(midnightPreview || draftCrossesMidnight(draft)) && (
-          <p className="rounded-xl border border-status-unclear/30 bg-status-unclear-soft px-3 py-2 text-xs font-semibold text-ink">
-            {MIDNIGHT_WARNING}
-          </p>
+        {draft.durationPreset === 'custom' ||
+        !DURATION_PRESETS.includes(
+          draft.requestedDurationMinutes as (typeof DURATION_PRESETS)[number],
+        ) ? (
+          <label className="mt-2.5 block text-[10px] font-bold uppercase tracking-wider text-ink-muted">
+            Custom minutes
+            <input
+              type="number"
+              min={1}
+              max={720}
+              value={draft.requestedDurationMinutes}
+              onChange={(e) =>
+                setDraft((d) => ({
+                  ...d,
+                  durationPreset: 'custom',
+                  requestedDurationMinutes: Math.max(
+                    1,
+                    Number(e.target.value) || 1,
+                  ),
+                }))
+              }
+              className="tap-target mt-1 w-full min-w-0 max-w-full rounded-xl border border-border bg-surface-muted px-3 py-2 text-base font-bold text-ink focus:outline-none focus:ring-2 focus:ring-brand/40"
+            />
+          </label>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setPreset('custom')}
+            className="mt-2 text-xs font-bold text-brand hover:opacity-80"
+          >
+            Custom duration…
+          </button>
         )}
-
-        <button
-          type="button"
-          onClick={handleApply}
-          className="tap-target w-full rounded-xl bg-brand py-3 text-sm font-extrabold text-white shadow-md shadow-brand/20"
-        >
-          Apply
-        </button>
       </div>
-    </ModalSheet>
+
+      {/* Midnight warning */}
+      {(midnightPreview || draftCrossesMidnight(draft)) && (
+        <div className="rounded-xl border border-status-unclear/30 bg-status-unclear-soft px-3 py-2 text-xs font-semibold text-ink">
+          {MIDNIGHT_WARNING}
+        </div>
+      )}
+
+      {/* Apply button */}
+      <button
+        type="button"
+        onClick={handleApply}
+        className="tap-target mt-2 w-full rounded-xl bg-brand py-3 text-sm font-bold text-white shadow-md shadow-brand/20 transition active:scale-[0.99]"
+      >
+        Apply
+      </button>
+    </div>
   )
 }
 
-function draftCrossesMidnight(draft: TimeQuery): boolean {
-  const start =
-    draft.mode === 'now'
-      ? new Date().getHours() * 60 + new Date().getMinutes()
-      : draft.startMinute
-  return start + draft.requestedDurationMinutes > 23 * 60 + 59
+export function TimeSheet({
+  open,
+  onClose,
+  query,
+  onApply,
+  midnightPreview,
+}: TimeSheetProps) {
+  return (
+    <ModalSheet open={open} title="Time" onClose={onClose} variant="bottom">
+      {open && (
+        <TimeSheetForm
+          query={query}
+          onClose={onClose}
+          onApply={onApply}
+          midnightPreview={midnightPreview}
+        />
+      )}
+    </ModalSheet>
+  )
 }

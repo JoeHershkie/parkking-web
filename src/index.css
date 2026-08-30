@@ -2,21 +2,22 @@
 @import 'maplibre-gl/dist/maplibre-gl.css';
 
 @theme {
-  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", 'DM Sans', ui-sans-serif, system-ui, sans-serif;
 
   --color-surface: #ffffff;
   --color-surface-muted: #f8fafc;
-  --color-surface-elevated: rgba(255, 255, 255, 0.95);
+  --color-surface-elevated: rgba(255, 255, 255, 0.92);
   --color-ink: #0f172a;
   --color-ink-muted: #64748b;
   --color-ink-subtle: #94a3b8;
   --color-border: #e2e8f0;
   --color-border-strong: #cbd5e1;
 
-  --color-brand: #059669;
-  --color-brand-soft: #ecfdf5;
-  --color-brand-ink: #047857;
+  /* Apple Blue Brand & UI colors */
+  --color-brand: #007AFF;
+  --color-brand-soft: #ebf5ff;
+  --color-brand-ink: #0062cc;
 
   --color-status-allowed: #059669;
   --color-status-allowed-soft: #ecfdf5;
@@ -27,10 +28,10 @@
   --color-status-likely: #0d9488;
   --color-status-likely-soft: #f0fdfa;
 
-  --radius-control: 1rem;
-  --radius-sheet: 1.25rem;
-  --shadow-float: 0 10px 30px -8px rgb(15 23 42 / 0.18);
-  --shadow-sheet: 0 -8px 30px -10px rgb(15 23 42 / 0.2);
+  --radius-control: 1.375rem; /* 22px */
+  --radius-sheet: 1.75rem;   /* 28px continuous squircle */
+  --shadow-float: 0 8px 24px -4px rgba(15, 23, 42, 0.16), 0 2px 6px -1px rgba(15, 23, 42, 0.08);
+  --shadow-sheet: 0 -10px 32px -8px rgba(15, 23, 42, 0.2), 0 -2px 6px -1px rgba(15, 23, 42, 0.06);
 
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
@@ -71,20 +72,20 @@
 
   body,
   #root {
-    /* Prefer large/small viewport units — avoid dvh so the soft keyboard does not
-       shrink the layout and slide the map. */
     min-height: 100vh;
     min-height: 100lvh;
     min-height: -webkit-fill-available;
   }
 
   body {
-    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-sans);
     color: var(--color-ink);
     font-synthesis: none;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   button,
@@ -98,7 +99,17 @@
   input,
   select,
   textarea {
-    font-size: 16px;
+    font-size: 16px !important;
+    -webkit-text-size-adjust: 100%;
+    -webkit-user-select: auto;
+    user-select: auto;
+  }
+
+  input[type="date"],
+  input[type="time"] {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   :focus-visible {
@@ -118,59 +129,156 @@
   }
 }
 
-@layer utilities {
-  .app-shell {
-    /*
-     * Keep the large viewport painted behind Safari's translucent chrome.
-     * An opaque fixed edge element is sampled as a solid toolbar tint on iOS.
-     * Use fixed + lvh (not dvh) so the soft keyboard overlays instead of
-     * pushing the map/UI up with the visual viewport.
-     */
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    height: 100vh;
-    height: 100lvh;
-    min-height: -webkit-fill-available;
-    overflow: hidden;
-  }
+.app-shell {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  height: 100vh;
+  height: 100lvh;
+  min-height: -webkit-fill-available;
+  overflow: hidden;
+}
 
-  .tap-target {
-    min-height: var(--control-min);
-    min-width: var(--control-min);
-  }
+/* Apple Liquid Glass styling (refractive specular highlight + high-saturation ambient blur + inner glow) */
+.ios-glass,
+.liquid-glass {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.90) 0%, rgba(255, 255, 255, 0.78) 100%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(190%) brightness(1.02) !important;
+  backdrop-filter: blur(24px) saturate(190%) brightness(1.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.75) !important;
+  box-shadow:
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.04),
+    0 10px 28px -4px rgba(15, 23, 42, 0.16),
+    0 2px 8px -1px rgba(15, 23, 42, 0.06) !important;
+}
 
-  .safe-pad-x {
-    padding-left: max(1rem, var(--safe-left));
-    padding-right: max(1rem, var(--safe-right));
-  }
+.ios-glass-sheet,
+.liquid-glass-sheet {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.90) 100%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(200%) brightness(1.02) !important;
+  backdrop-filter: blur(32px) saturate(200%) brightness(1.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+  border-bottom: 0 !important;
+  box-shadow:
+    inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.95),
+    0 -12px 36px -8px rgba(15, 23, 42, 0.2),
+    0 -3px 10px -2px rgba(15, 23, 42, 0.06) !important;
+}
 
-  .safe-pad-top {
-    padding-top: max(0.75rem, var(--safe-top));
-  }
+.tap-target {
+  min-height: var(--control-min);
+  min-width: var(--control-min);
+}
 
-  .safe-pad-bottom {
-    padding-bottom: max(1rem, var(--safe-bottom));
-  }
+.safe-pad-x {
+  padding-left: max(0.875rem, var(--safe-left));
+  padding-right: max(0.875rem, var(--safe-right));
+}
 
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
+.safe-pad-top {
+  padding-top: max(0.625rem, var(--safe-top));
+}
+
+.safe-pad-bottom {
+  padding-bottom: max(1rem, var(--safe-bottom));
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Apple Maps user location blue dot with pulsing halo */
+.user-location-marker {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.user-location-halo {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  border-radius: 9999px;
+  background-color: rgba(0, 122, 255, 0.22);
+  animation: user-location-pulse 2.4s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+.user-location-dot {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background-color: #007AFF;
+  border: 2.5px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0, 122, 255, 0.3);
+}
+
+@keyframes user-location-pulse {
+  0% {
+    transform: scale(0.35);
+    opacity: 0.95;
   }
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+  65% {
+    transform: scale(1.15);
+    opacity: 0.2;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
   }
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* Apple Maps searched location balloon pin */
+.apple-search-pin-marker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.apple-search-pin-balloon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+}
+
+.apple-search-pin-ground-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background-color: #e51950;
+  margin-top: -2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.apple-search-pin-label {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0f172a;
+  background-color: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 2.5px 8px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
 }

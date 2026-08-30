@@ -52,6 +52,23 @@ npm run preview
 
 Schedule logic lives under [`src/lib/schedule/`](src/lib/schedule/) and mirrors the parking-pipeline contract. Display text for bylaws still comes from the `Rule` property; filtering never regex-parses `Rule`.
 
+## Basemap Styling
+
+The basemap uses a custom **Apple Maps Light** vector style ([`public/style/apple-maps.json`](public/style/apple-maps.json)) rendered via **MapLibre GL JS** on top of OpenFreeMap vector tiles (`tiles.openfreemap.org`).
+
+- **Aesthetics**: Warm neutral background (`#f4f3ef`), pastel sky-blue water (`#a0c8f0`), soft mint green parks (`#d8ebd4`), crisp white roadways with subtle casings, and charcoal system typography.
+- **Cost**: 100% free and open-source with no API keys or tile limits.
+- **Contrast**: Provides high-contrast separation for Toronto's green (allowed), red (restricted), and amber (unclear) curb regulations.
+
+### Future Roadmap: Apple MapKit JS Migration
+
+If you decide to switch from MapLibre GL to native **Apple MapKit JS** in the future:
+1. **Apple Developer Account**: Requires an Apple Developer Program membership ($99/year) to generate a Maps Identifier and Private Key (`.p8`).
+2. **Cloudflare Pages Compatibility (No Server Needed)**:
+   - *Option A (Static)*: Generate a long-lived JWT token (valid up to 1 year) restricted to your domain and supply it via `VITE_MAPKIT_TOKEN`.
+   - *Option B (Edge Serverless)*: Add a Cloudflare Pages Function at `functions/api/token.ts` that signs short-lived ES256 tokens using the Web Crypto API.
+3. **Layer Migration**: Port curb segment drawing from MapLibre GL's WebGL GeoJSON layers to MapKit JS `PolylineOverlay` / `ItemCollection`.
+
 ## Tests
 
 ```bash
