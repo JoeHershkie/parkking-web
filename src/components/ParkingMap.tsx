@@ -111,6 +111,7 @@ function addParkingLayers(map: maplibregl.Map) {
     layout: {
       'line-cap': 'round',
       'line-join': 'round',
+      'line-sort-key': 100,
     },
     paint: {
       'line-color': selectedBorderColor,
@@ -129,6 +130,7 @@ function addParkingLayers(map: maplibregl.Map) {
     layout: {
       'line-cap': 'round',
       'line-join': 'round',
+      'line-sort-key': 101,
     },
     paint: {
       'line-color': lineColorExpression,
@@ -296,11 +298,7 @@ export function ParkingMap({
       const filter: maplibregl.FilterSpecification =
         keys.length === 0
           ? HIDDEN_FILTER
-          : ([
-              'in',
-              ['get', '_featureKey'],
-              ['literal', keys],
-            ] as maplibregl.FilterSpecification)
+          : (['in', '_featureKey', ...keys] as unknown as maplibregl.FilterSpecification)
 
       if (map.getLayer(PARKING_HIGHLIGHT_CASING_LAYER_ID)) {
         map.setFilter(PARKING_HIGHLIGHT_CASING_LAYER_ID, filter)
@@ -309,6 +307,7 @@ export function ParkingMap({
         map.setFilter(PARKING_HIGHLIGHT_LAYER_ID, filter)
       }
     }
+
 
     const refreshViewport = (): number | null => {
       const index = indexRef.current

@@ -126,8 +126,37 @@ export function distancePointToFeatureMeters(
   return min
 }
 
+function geometryFingerprint(geom: ParkingFeature['geometry']): string {
+  if (!geom) return ''
+  if (geom.type === 'LineString') {
+    const coords = geom.coordinates
+    if (coords.length === 0) return ''
+    const first = coords[0]
+    const last = coords[coords.length - 1]
+    return `${first[0].toFixed(5)},${first[1].toFixed(5)}-${last[0].toFixed(5)},${last[1].toFixed(5)}`
+  }
+  if (geom.type === 'MultiLineString') {
+    const coords = geom.coordinates
+    if (coords.length === 0) return ''
+    const first = coords[0]?.[0]
+    const lastPart = coords[coords.length - 1]
+    const last = lastPart ? lastPart[lastPart.length - 1] : undefined
+    if (!first || !last) return ''
+    return `${first[0].toFixed(5)},${first[1].toFixed(5)}-${last[0].toFixed(5)},${last[1].toFixed(5)}`
+  }
+  return ''
+}
+
 export function stableFeatureKey(feature: ParkingFeature): string {
-  return ruleFeatureKey(feature.properties)
+  const baseKey = ruleFeatureKey(feature.properties)
+  if (feature.properties._id != null) {
+    return `${baseKey}|#${feature.properties._id}`
+  }
+  if (feature.id != null) {
+    return `${baseKey}|#${feature.id}`
+  }
+  const fp = geometryFingerprint(feature.geometry)
+  return fp ? `${baseKey}|@${fp}` : baseKey
 }
 
 /**
@@ -142,7 +171,7 @@ export function findNearestCurbCandidates(
     maxCandidates?: number
   } = {},
 ): CurbCandidate[] {
-  const maxDistanceMeters = options.maxDistanceMeters ?? 80
+  const maxDistanceMeters = options.maxDistanceMeters ?? 120
   const maxCandidates = options.maxCandidates ?? 40
 
   const scored: CurbCandidate[] = []

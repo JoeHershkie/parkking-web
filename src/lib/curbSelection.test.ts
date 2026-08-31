@@ -184,4 +184,23 @@ describe('curbSelection', () => {
     )
     expect(cornerRules).toContain('anytime no stopping')
   })
+
+  it('generates distinct feature keys for separate segments with identical rule text', () => {
+    const segA = line('Queen St', 'North', [
+      [-79.4, 43.65],
+      [-79.401, 43.65],
+    ], 'no parking')
+    const segB = line('Queen St', 'North', [
+      [-79.42, 43.66],
+      [-79.421, 43.66],
+    ], 'no parking')
+
+    const resA = selectNearestCurb([segA, segB], { lng: -79.4005, lat: 43.65005 })
+    const resB = selectNearestCurb([segA, segB], { lng: -79.4205, lat: 43.66005 })
+
+    expect(resA.selected).toBeTruthy()
+    expect(resB.selected).toBeTruthy()
+    expect(resA.selected!.featureKeys).not.toEqual(resB.selected!.featureKeys)
+  })
 })
+

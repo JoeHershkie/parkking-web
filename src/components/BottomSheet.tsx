@@ -19,6 +19,7 @@ type BottomSheetProps = {
   detent: SheetDetent
   onDetentChange: (detent: SheetDetent) => void
   onClose?: () => void
+  onVisualHeightChange?: (height: number, isDragging: boolean) => void
   children: ReactNode
 }
 
@@ -27,6 +28,7 @@ export function BottomSheet({
   detent,
   onDetentChange,
   onClose,
+  onVisualHeightChange,
   children,
 }: BottomSheetProps) {
   const [prevOpen, setPrevOpen] = useState(open)
@@ -83,6 +85,14 @@ export function BottomSheet({
   const currentTargetHeight = getTargetHeight(detent)
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800
 
+  useEffect(() => {
+    if (!open || !shouldRender || isExiting) {
+      onVisualHeightChange?.(0, false)
+    } else if (!isDragging) {
+      onVisualHeightChange?.(currentTargetHeight, false)
+    }
+  }, [open, shouldRender, isExiting, isDragging, currentTargetHeight, onVisualHeightChange])
+
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return
     try {
@@ -95,12 +105,16 @@ export function BottomSheet({
     pointerStartTime.current = Date.now()
     setIsDragging(true)
     setDragY(0)
+    onVisualHeightChange?.(currentTargetHeight, true)
   }
 
   const handlePointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!isPointerDownRef.current) return
     const deltaY = e.clientY - pointerStartY.current
     setDragY(deltaY)
+    const nextDragState = computeSheetDragState(detent, deltaY, vh, Boolean(onClose))
+    const visualH = Math.max(0, nextDragState.height - nextDragState.translateY)
+    onVisualHeightChange?.(visualH, true)
   }
 
   const handlePointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -128,8 +142,11 @@ export function BottomSheet({
     )
 
     if (result.action === 'dismiss') {
+      onVisualHeightChange?.(0, false)
       onClose?.()
     } else {
+      const nextH = getSheetTargetHeight(result.detent, vh)
+      onVisualHeightChange?.(nextH, false)
       onDetentChange(result.detent)
     }
   }
@@ -139,6 +156,7 @@ export function BottomSheet({
     isPointerDownRef.current = false
     setIsDragging(false)
     setDragY(0)
+    onVisualHeightChange?.(currentTargetHeight, false)
   }
 
   if (!shouldRender) return null

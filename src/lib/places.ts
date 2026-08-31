@@ -146,3 +146,94 @@ export async function placeDetails(
 
   return { lat, lng, formattedAddress }
 }
+
+export async function reverseGeocode(
+  lat: number,
+  lng: number,
+): Promise<string | null> {
+  // 1. Try OpenStreetMap Nominatim reverse geocoder by default
+  try {
+    const url = new URL('https://nominatim.openstreetmap.org/reverse')
+    url.searchParams.set('lat', lat.toString())
+    url.searchParams.set('lon', lng.toString())
+    url.searchParams.set('format', 'jsonv2')
+
+    const res = await fetch(url.toString(), {
+      headers: {
+        'Accept-Language': 'en',
+      },
+    })
+    if (res.ok) {
+      const data = (await res.json()) as {
+        name?: string
+        display_name?: string
+        address?: {
+          house_number?: string
+          road?: string
+          pedestrian?: string
+          amenity?: string
+          building?: string
+        }
+      }
+
+      const road = data.address?.road ?? data.address?.pedestrian
+      const houseNumber = data.address?.house_number
+
+      if (houseNumber && road) {
+        return `${houseNumber} ${road}`
+      }
+      if (road) {
+        return road
+      }
+      if (data.name) {
+        return data.name
+      }
+      if (data.display_name) {
+        return formatShortAddress(data.display_name)
+      }
+    }
+  } catch {
+    // Fall through to Google Maps fallback
+  }
+
+  // 2. Fallback to Google Maps Geocoding API if key is configured
+  const apiKey = getPlacesApiKey()
+  if (apiKey) {
+    try {
+      const url = new URL('https://maps.googleapis.com/maps/api/geocode/json')
+      url.searchParams.set('latlng', `${lat},${lng}`)
+      url.searchParams.set('key', apiKey)
+
+      const res = await fetch(url.toString())
+      if (res.ok) {
+        const data = (await res.json()) as {
+          status?: string
+          results?: Array<{
+            formatted_address?: string
+            types?: string[]
+          }>
+        }
+        if (data.status === 'OK' && data.results && data.results.length > 0) {
+          const streetResult =
+            data.results.find(
+              (r) =>
+                r.types?.includes('street_address') ||
+                r.types?.includes('premise') ||
+                r.types?.includes('subpremise') ||
+                r.types?.includes('route'),
+            ) ?? data.results[0]
+
+          if (streetResult?.formatted_address) {
+            return formatShortAddress(streetResult.formatted_address)
+          }
+        }
+      }
+    } catch {
+      // Fall through to null
+    }
+  }
+
+  return null
+}
+
+

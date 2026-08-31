@@ -5,7 +5,7 @@ import type {
 } from '../types/parking'
 import { forEachPosition, isLineGeometry } from './geometry'
 import { evaluateInRange, type Slot } from './schedule'
-import { ruleFeatureKey } from './labels'
+import { stableFeatureKey } from './curbSelection'
 
 export type BBox = {
   minLng: number
@@ -84,7 +84,7 @@ export class ParkingSpatialIndex {
       }
       this.features.push({
         feature,
-        featureKey: ruleFeatureKey(feature.properties),
+        featureKey: stableFeatureKey(feature),
         ...bbox,
         cells,
       })
@@ -148,7 +148,7 @@ export function enrichFeaturesSubset(
         endMinuteOfDay,
         includeUnknown,
       )
-      const featureKey = ruleFeatureKey(feature.properties)
+      const featureKey = stableFeatureKey(feature)
       return {
         ...feature,
         properties: {

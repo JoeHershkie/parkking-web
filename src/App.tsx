@@ -7,13 +7,12 @@ import {
 import { TimeSheet } from './components/TimeSheet'
 import { TopControls } from './components/TopControls'
 import { VerdictSheet } from './components/VerdictSheet'
-import { getSheetTargetHeight } from './lib/sheetDetents'
 import { useGeolocation } from './hooks/useGeolocation'
 import {
   selectNearestCurb,
   type CurbSideGroup,
 } from './lib/curbSelection'
-import { formatShortAddress } from './lib/places'
+import { formatShortAddress, reverseGeocode } from './lib/places'
 import {
   addFavorite,
   addRecent,
@@ -44,6 +43,7 @@ type SelectionState = {
 
 function App() {
   const mapHandleRef = useRef<ParkingMapHandle | null>(null)
+  const geocodeSeqRef = useRef(0)
   const [dataReady, setDataReady] = useState(false)
   const [locationOpen, setLocationOpen] = useState(false)
   const [timeOpen, setTimeOpen] = useState(false)
@@ -56,6 +56,16 @@ function App() {
   const [recents, setRecents] = useState<SavedLocation[]>(() => loadRecents())
   const [favorites, setFavorites] = useState<SavedLocation[]>(() =>
     loadFavorites(),
+  )
+  const [sheetHeight, setSheetHeight] = useState(0)
+  const [isSheetDragging, setIsSheetDragging] = useState(false)
+
+  const handleSheetVisualHeightChange = useCallback(
+    (height: number, isDragging: boolean) => {
+      setSheetHeight(height)
+      setIsSheetDragging(isDragging)
+    },
+    [],
   )
 
   const geo = useGeolocation({ autoLocateOnMount: true })
@@ -142,8 +152,11 @@ function App() {
       const index = handle?.getIndex()
       if (!handle || !index) return
 
+      const currentZoom = handle.getMap()?.getZoom() ?? 17
+      const targetZoom = Math.max(currentZoom, 17)
+
       if (options?.fly !== false) {
-        await handle.flyTo(lng, lat, 17)
+        void handle.flyTo(lng, lat, targetZoom)
       }
 
       const result = selectNearestCurb(
@@ -168,6 +181,21 @@ function App() {
 
       if (label) {
         setRecents(addRecent({ label: displayLabel, lat, lng }))
+      } else {
+        // Asynchronously reverse geocode tapped location to resolve real street address
+        const seq = ++geocodeSeqRef.current
+        void reverseGeocode(lat, lng).then((resolvedAddress) => {
+          if (geocodeSeqRef.current !== seq || !resolvedAddress) return
+          setLocationLabel(resolvedAddress)
+          setSelection((prev) =>
+            prev &&
+            Math.abs(prev.point.lat - lat) < 1e-6 &&
+            Math.abs(prev.point.lng - lng) < 1e-6
+              ? { ...prev, label: resolvedAddress }
+              : prev,
+          )
+          setRecents(addRecent({ label: resolvedAddress, lat, lng }))
+        })
       }
     },
     [],
@@ -183,7 +211,7 @@ function App() {
 
   const handlePointSelected = useCallback(
     (lngLat: [number, number]) => {
-      void selectAtPoint(lngLat[0], lngLat[1], null, { fly: false })
+      void selectAtPoint(lngLat[0], lngLat[1], null, { fly: true })
     },
     [selectAtPoint],
   )
@@ -254,14 +282,8 @@ function App() {
       <TopControls
         locationLabel={locationLabel}
         timeLabel={timeChip}
-        offsetY={
-          selection != null
-            ? getSheetTargetHeight(
-                'peek',
-                typeof window !== 'undefined' ? window.innerHeight : 800,
-              )
-            : 0
-        }
+        offsetY={selection != null ? sheetHeight : 0}
+        isDragging={isSheetDragging}
         hasLocation={Boolean(geo.position || geo.status === 'granted')}
         isTrackingLocation={isTrackingLocation}
         onOpenLocation={() => setLocationOpen(true)}
@@ -278,11 +300,16 @@ function App() {
         groups={selection?.groups ?? []}
         selectedGroupKey={selection?.selectedGroupKey ?? null}
         onSelectGroup={handleSelectGroup}
-        onClose={() => setSelection(null)}
-        onOpenLocation={() => setLocationOpen(true)}
-        onOpenTime={() => setTimeOpen(true)}
+        onClose={() => {
+          setSelection(null)
+          setSheetHeight(0)
+          setIsSheetDragging(false)
+        }}
+        onVisualHeightChange={handleSheetVisualHeightChange}
         resolved={resolved}
       />
+
+
 
       <LocationSheet
         open={locationOpen}

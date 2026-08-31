@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Clock,
   Copy,
   HelpCircle,
   X,
@@ -32,8 +31,7 @@ type VerdictSheetProps = {
   selectedGroupKey: string | null
   onSelectGroup: (groupKey: string) => void
   onClose?: () => void
-  onOpenLocation?: () => void
-  onOpenTime?: () => void
+  onVisualHeightChange?: (height: number, isDragging: boolean) => void
   resolved: ResolvedTimeQuery
   visible: boolean
 }
@@ -121,8 +119,7 @@ export function VerdictSheet({
   selectedGroupKey,
   onSelectGroup,
   onClose,
-  onOpenLocation,
-  onOpenTime,
+  onVisualHeightChange,
   resolved,
   visible,
 }: VerdictSheetProps) {
@@ -151,7 +148,6 @@ export function VerdictSheet({
   if (!visible || !verdict) return null
 
   const styles = statusStyles(verdict.status) ?? statusStyles('schedule_unclear')
-  const street = verdict.street ?? 'Selected location'
   const side = verdict.sideDisplay
 
   async function copyRule(text: string, key: string) {
@@ -182,6 +178,7 @@ export function VerdictSheet({
         detent={detent}
         onDetentChange={setDetent}
         onClose={onClose}
+        onVisualHeightChange={onVisualHeightChange}
       >
         <div className="space-y-2.5">
           {/* Header Summary */}
@@ -189,35 +186,14 @@ export function VerdictSheet({
             <div className="flex items-start gap-2.5 min-w-0 flex-1">
               <div className="mt-0.5">{styles.icon}</div>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={onOpenLocation}
-                    className="truncate text-base font-bold text-ink leading-snug hover:opacity-80 text-left"
-                    title="Change location"
-                  >
-                    {street}
-                  </button>
-                  {onOpenTime && resolved.label && (
-                    <button
-                      type="button"
-                      onClick={onOpenTime}
-                      className="inline-flex items-center gap-1 rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] font-bold text-slate-700 hover:bg-slate-300 transition"
-                      title="Change check time"
-                    >
-                      <Clock className="h-3 w-3" />
-                      <span>{resolved.label}</span>
-                    </button>
-                  )}
-                </div>
+                <h2 className={`text-base font-bold leading-snug ${styles.color}`}>
+                  {verdict.headline}
+                </h2>
                 {side && (
                   <p className="text-xs font-semibold text-ink-muted">
                     {side}
                   </p>
                 )}
-                <p className={`text-xs font-bold ${styles.color}`}>
-                  {verdict.headline}
-                </p>
               </div>
             </div>
 
@@ -225,7 +201,7 @@ export function VerdictSheet({
               <button
                 type="button"
                 onClick={onClose}
-                className="tap-target -mr-1 -mt-1 inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+                className="tap-target -mr-1 -mt-1 inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition cursor-pointer"
                 aria-label="Close verdict"
               >
                 <X className="h-4 w-4" />

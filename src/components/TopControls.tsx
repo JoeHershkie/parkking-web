@@ -9,6 +9,7 @@ type TopControlsProps = {
   disabled?: boolean
   errorMessage?: string | null
   offsetY?: number
+  isDragging?: boolean
   onOpenLocation: () => void
   onOpenTime: () => void
   onLocate: () => void
@@ -23,16 +24,25 @@ export function TopControls({
   disabled,
   errorMessage,
   offsetY = 0,
+  isDragging = false,
   onOpenLocation,
   onOpenTime,
   onLocate,
 }: TopControlsProps) {
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800
+  const maxOffsetY = Math.max(0, vh - 96)
+  const effectiveOffsetY = Math.min(offsetY, maxOffsetY)
+
   return (
     <div
       style={{
-        transform: offsetY > 0 ? `translateY(-${offsetY}px)` : 'translateY(0)',
+        transform: effectiveOffsetY > 0 ? `translateY(-${effectiveOffsetY}px)` : 'translateY(0)',
       }}
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-20 flex justify-center safe-pad-x safe-pad-bottom pb-3 transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
+      className={`pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center safe-pad-x safe-pad-bottom pb-3 ${
+        isDragging
+          ? ''
+          : 'transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]'
+      }`}
     >
       <div className="pointer-events-auto flex w-full max-w-[var(--overlay-max)] flex-col gap-2">
         {/* Location Error Banner */}
