@@ -1,5 +1,5 @@
 import type { ParkingFeature } from '../types/parking'
-import { geometryMidpoint, isLineGeometry, lineParts } from './geometry'
+import { isLineGeometry, lineParts } from './geometry'
 import { ruleFeatureKey } from './labels'
 import {
   curbGroupKey,
@@ -126,8 +126,37 @@ export function distancePointToFeatureMeters(
   return min
 }
 
+function geometryFingerprint(geom: ParkingFeature['geometry']): string {
+  if (!geom) return ''
+  if (geom.type === 'LineString') {
+    const coords = geom.coordinates
+    if (coords.length === 0) return ''
+    const first = coords[0]
+    const last = coords[coords.length - 1]
+    return `${first[0].toFixed(5)},${first[1].toFixed(5)}-${last[0].toFixed(5)},${last[1].toFixed(5)}`
+  }
+  if (geom.type === 'MultiLineString') {
+    const coords = geom.coordinates
+    if (coords.length === 0) return ''
+    const first = coords[0]?.[0]
+    const lastPart = coords[coords.length - 1]
+    const last = lastPart ? lastPart[lastPart.length - 1] : undefined
+    if (!first || !last) return ''
+    return `${first[0].toFixed(5)},${first[1].toFixed(5)}-${last[0].toFixed(5)},${last[1].toFixed(5)}`
+  }
+  return ''
+}
+
 export function stableFeatureKey(feature: ParkingFeature): string {
-  return ruleFeatureKey(feature.properties)
+  const baseKey = ruleFeatureKey(feature.properties)
+  if (feature.properties._id != null) {
+    return `${baseKey}|#${feature.properties._id}`
+  }
+  if (feature.id != null) {
+    return `${baseKey}|#${feature.id}`
+  }
+  const fp = geometryFingerprint(feature.geometry)
+  return fp ? `${baseKey}|@${fp}` : baseKey
 }
 
 /**
@@ -142,7 +171,7 @@ export function findNearestCurbCandidates(
     maxCandidates?: number
   } = {},
 ): CurbCandidate[] {
-  const maxDistanceMeters = options.maxDistanceMeters ?? 80
+  const maxDistanceMeters = options.maxDistanceMeters ?? 120
   const maxCandidates = options.maxCandidates ?? 40
 
   const scored: CurbCandidate[] = []
@@ -167,18 +196,32 @@ export function findNearestCurbCandidates(
   return scored.slice(0, maxCandidates)
 }
 
+export type GroupLocalCurbSidesOptions = {
+  /**
+   * Maximum distance tolerance (in meters) beyond the nearest candidate's distance
+   * to group co-located or overlapping rules on the same curb segment.
+   * Defaults to 12 meters.
+   */
+  segmentToleranceMeters?: number
+  /** Legacy alias for segmentToleranceMeters. */
+  localClusterMeters?: number
+}
+
+const DEFAULT_SEGMENT_TOLERANCE_METERS = 12
+
 /**
- * Group candidates that share normalized street+side AND are geometrically local
- * to the nearest feature of that group (not whole-street global grouping).
+ * Group candidates that share normalized street+side for the tapped curb segment.
+ * Includes co-located / overlapping rules on that segment while excluding separate
+ * bylaw segments further down the block.
  */
 export function groupLocalCurbSides(
   candidates: CurbCandidate[],
-  options: {
-    /** Max distance between a candidate and the group's nearest feature. */
-    localClusterMeters?: number
-  } = {},
+  options: GroupLocalCurbSidesOptions = {},
 ): CurbSideGroup[] {
-  const localClusterMeters = options.localClusterMeters ?? 120
+  const tolerance =
+    options.segmentToleranceMeters ??
+    options.localClusterMeters ??
+    DEFAULT_SEGMENT_TOLERANCE_METERS
   if (candidates.length === 0) return []
 
   const byGroup = new Map<string, CurbCandidate[]>()
@@ -192,9 +235,8 @@ export function groupLocalCurbSides(
   for (const [, members] of byGroup) {
     members.sort((a, b) => a.distanceMeters - b.distanceMeters)
     const nearest = members[0]
-    const clustered = members.filter((m) =>
-      featureLocalTo(m.feature, nearest.feature, localClusterMeters),
-    )
+    const maxAllowedDist = Math.max(15, nearest.distanceMeters + tolerance)
+    const clustered = members.filter((m) => m.distanceMeters <= maxAllowedDist)
     const use = clustered.length > 0 ? clustered : [nearest]
 
     const seen = new Set<string>()
@@ -223,22 +265,6 @@ export function groupLocalCurbSides(
   return groups
 }
 
-function featureLocalTo(
-  a: ParkingFeature,
-  b: ParkingFeature,
-  maxMeters: number,
-): boolean {
-  const midA = midpoint(a)
-  const midB = midpoint(b)
-  if (!midA || !midB) return false
-  return haversineMeters(midA, midB) <= maxMeters
-}
-
-function midpoint(feature: ParkingFeature): LngLat | null {
-  if (!isLineGeometry(feature.geometry)) return null
-  return geometryMidpoint(feature.geometry)
-}
-
 export type SelectionResult = {
   groups: CurbSideGroup[]
   selectedGroupKey: string | null
@@ -253,6 +279,7 @@ export function selectNearestCurb(
   point: LngLat,
   options?: {
     maxDistanceMeters?: number
+    segmentToleranceMeters?: number
     localClusterMeters?: number
     preferredGroupKey?: string | null
   },
@@ -261,6 +288,7 @@ export function selectNearestCurb(
     maxDistanceMeters: options?.maxDistanceMeters,
   })
   const groups = groupLocalCurbSides(candidates, {
+    segmentToleranceMeters: options?.segmentToleranceMeters,
     localClusterMeters: options?.localClusterMeters,
   })
 

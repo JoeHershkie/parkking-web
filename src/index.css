@@ -168,6 +168,19 @@
     0 -3px 10px -2px rgba(15, 23, 42, 0.06) !important;
 }
 
+.ios-glass-sheet-translucent,
+.liquid-glass-sheet-translucent {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.68) 100%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) brightness(1.02) !important;
+  backdrop-filter: blur(28px) saturate(190%) brightness(1.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.70) !important;
+  border-bottom: 0 !important;
+  box-shadow:
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.95),
+    0 -10px 32px -8px rgba(15, 23, 42, 0.16),
+    0 -2px 8px -1px rgba(15, 23, 42, 0.05) !important;
+}
+
 .tap-target {
   min-height: var(--control-min);
   min-width: var(--control-min);

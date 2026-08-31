@@ -128,7 +128,7 @@ export function LocationSheet({
     <ModalSheet open={open} hideHeader={true} fullscreen={true} onClose={onClose} variant="bottom">
       <div className="space-y-2 pb-2">
         {/* iOS-styled Pill Search Bar without outline */}
-        <label className="relative block pt-1">
+        <label className="relative block">
           <span className="sr-only">Search address</span>
           <Search
             className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"

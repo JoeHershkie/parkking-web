@@ -1,7 +1,11 @@
-import type { ParkingFeature, ParkingFeatureCollection } from '../types/parking'
+import type {
+  ParkingFeature,
+  ParkingFeatureCollection,
+  ParkingProperties,
+} from '../types/parking'
 import { forEachPosition, isLineGeometry } from './geometry'
 import { evaluateInRange, type Slot } from './schedule'
-import { ruleFeatureKey } from './labels'
+import { stableFeatureKey } from './curbSelection'
 
 export type BBox = {
   minLng: number
@@ -80,7 +84,7 @@ export class ParkingSpatialIndex {
       }
       this.features.push({
         feature,
-        featureKey: ruleFeatureKey(feature.properties),
+        featureKey: stableFeatureKey(feature),
         ...bbox,
         cells,
       })
@@ -124,6 +128,12 @@ export class ParkingSpatialIndex {
   }
 }
 
+export function hasUncertainCurbPlacement(props: ParkingProperties): boolean {
+  if (props.curb_geometry_method === 'centerline_unresolved') return true
+  const warnings = props.curb_warnings ?? []
+  return warnings.includes('SIDE_AMBIGUOUS') || warnings.includes('CENTERLINE_FALLBACK')
+}
+
 export function enrichFeaturesSubset(
   features: ParkingFeature[],
   slot: Slot,
@@ -138,7 +148,7 @@ export function enrichFeaturesSubset(
         endMinuteOfDay,
         includeUnknown,
       )
-      const featureKey = ruleFeatureKey(feature.properties)
+      const featureKey = stableFeatureKey(feature)
       return {
         ...feature,
         properties: {
@@ -148,6 +158,7 @@ export function enrichFeaturesSubset(
           _unparsed: evaluation.unparsed,
           _partial: evaluation.partial,
           _failed: evaluation.failed,
+          _uncertainPlacement: hasUncertainCurbPlacement(feature.properties),
           _featureKey: featureKey,
           _severity: severityOrder(evaluation.polarity, evaluation.unparsed),
         },
