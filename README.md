@@ -5,18 +5,18 @@ Mobile-first map of geocoded Toronto curb parking bylaws. Data is produced by th
 ## Prerequisites
 
 - Node.js 20+
-- Map data: copy `final_parking_map.geojson` from the pipeline repo into this project:
+- Map data: A pre-bundled dataset is included at [`public/data/final_parking_map.geojson`](public/data/final_parking_map.geojson). Whenever you re-run the pipeline in `parkking-pipeline`, refresh the copy so features include updated structured `schedule` objects (`v: 1`):
 
 ```bash
 cp ../parkking-pipeline/data/final_parking_map.geojson public/data/
 ```
 
-GeoJSON files under `public/data/` are gitignored; refresh the copy whenever you re-run the pipeline fullrun so features include structured `schedule` objects (`v: 1`).
+### Address search (Google Places - Optional)
 
-### Address search (Google Places)
+Map browsing, curb inspection, and map-tap reverse geocoding (via OpenStreetMap Nominatim) work out-of-the-box without an API key. For address autocomplete search:
 
 1. Create a [Google Cloud](https://console.cloud.google.com/) project with billing enabled.
-2. Enable **Places API (New)**.
+2. Enable **Places API (New)** (and optionally **Geocoding API** for enhanced reverse geocoding fallback).
 3. Create a browser API key restricted to HTTP referrers (e.g. `http://localhost:5173/*`) and Places APIs only.
 4. Copy `.env.example` to `.env` and set `VITE_GOOGLE_MAPS_API_KEY`.
 
@@ -31,6 +31,16 @@ npm run dev
 
 Open the URL shown in the terminal (usually http://localhost:5173).
 
+### Lint & Test
+
+```bash
+# Run ESLint
+npm run lint
+
+# Run Vitest test suite
+npm test
+```
+
 ## Build
 
 ```bash
@@ -41,12 +51,14 @@ npm run preview
 ## Map features
 
 - Full-screen mobile UI with floating location, time, and GPS controls (same chrome on desktop, max-width column)
+- Dynamic bottom sheet with gesture detents (peek / expanded / full) and smooth floating control offset tracking
 - Zoom-gated curb lines (appear around zoom 14.5+) with severity-ordered coloring: allowed, unclear, restricted
 - Viewport-subset schedule evaluation via a spatial index (avoids re-serializing the whole city on every time change)
 - Composed curb-side verdict from all locally overlapping rules: parking allowed, not allowed, likely allowed, or schedule unclear
 - Time query defaults to **Now** with duration chips (30m / 1h / 2h / 3h); midnight-crossing durations are truncated and disclosed
 - Prominent max-stay warnings when the requested duration exceeds `maxMinutes`
 - Search (Google Places), GPS, and map taps all feed the same nearest-curb selection flow with a curb-side switcher
+- Reverse geocoding on map tap (via OpenStreetMap Nominatim with Google Geocoding fallback) to display human-readable street addresses
 - Local recents and favorites (coordinates + labels only); GPS permission only after first explicit use, then auto-locate when already granted
 - Every verdict includes “Check posted signs.”
 
@@ -69,8 +81,4 @@ If you decide to switch from MapLibre GL to native **Apple MapKit JS** in the fu
    - *Option B (Edge Serverless)*: Add a Cloudflare Pages Function at `functions/api/token.ts` that signs short-lived ES256 tokens using the Web Crypto API.
 3. **Layer Migration**: Port curb segment drawing from MapLibre GL's WebGL GeoJSON layers to MapKit JS `PolylineOverlay` / `ItemCollection`.
 
-## Tests
 
-```bash
-npm test
-```
